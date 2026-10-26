@@ -4,7 +4,9 @@
 import type { EntityName } from '../domain/model';
 
 export type ColType = 'string' | 'number' | 'int' | 'bool' | 'date' | 'datetime' | 'formula';
-export interface ColumnDef { key: string; header: string; type: ColType; formula?: (rowRef: (key: string) => string) => string }
+/** Разделитель аргументов в формулах: зависит от локали таблицы (ru_RU — «;»), G27. */
+export type FormulaSeparator = ',' | ';';
+export interface ColumnDef { key: string; header: string; type: ColType; formula?: (rowRef: (key: string) => string, sep?: FormulaSeparator) => string }
 export interface SheetDef { entity: EntityName | 'settings' | 'meta' | 'log'; sheet: string; columns: ColumnDef[] }
 export type Cell = string | number | boolean | null;
 
@@ -14,9 +16,9 @@ export const REPORT_SHEET = 'Себестоимость' as const;
 
 const c = (key: string, header: string, type: ColType = 'string'): ColumnDef => ({ key, header, type });
 const id = c('id', 'id');
-const translate = (sourceKey: string) => (rowRef: (key: string) => string) => {
+const translate = (sourceKey: string) => (rowRef: (key: string) => string, sep: FormulaSeparator = ',') => {
   const ref = rowRef(sourceKey);
-  return `=IF(ISBLANK(${ref}),"",GOOGLETRANSLATE(${ref},"ru","en"))`;
+  return `=IF(ISBLANK(${ref})${sep}""${sep}GOOGLETRANSLATE(${ref}${sep}"ru"${sep}"en"))`;
 };
 
 export const SHEETS: SheetDef[] = [

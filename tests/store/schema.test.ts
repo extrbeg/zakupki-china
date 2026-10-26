@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SHEETS, SCHEMA_VERSION, toRow, fromRow, type SheetDef } from '../../src/store/schema';
+import { separatorForLocale } from '../../src/store/sheetsStore';
 import { ENTITY_NAMES } from '../../src/domain/model';
 import type { Order, Line, Carrier, Rate, Cost, SupplierOrder } from '../../src/domain/model';
 
@@ -61,6 +62,24 @@ describe('SHEETS', () => {
     const ref = (k: string) => ({ customerName: 'E7', techParams: 'F7' }[k] ?? '?');
     expect(en.formula!(ref)).toBe('=IF(ISBLANK(E7),"",GOOGLETRANSLATE(E7,"ru","en"))');
     expect(tech.formula!(ref)).toBe('=IF(ISBLANK(F7),"",GOOGLETRANSLATE(F7,"ru","en"))');
+  });
+
+  it('G27: формула перевода с разделителем «;» для локали с десятичной запятой', () => {
+    const en = sheet('lines').columns.find((c) => c.key === 'customerNameEn')!;
+    const ref = (k: string) => ({ customerName: 'F5' }[k] ?? '?');
+    expect(en.formula!(ref, ';')).toBe('=IF(ISBLANK(F5);"";GOOGLETRANSLATE(F5;"ru";"en"))');
+    expect(en.formula!(ref, ',')).toBe('=IF(ISBLANK(F5),"",GOOGLETRANSLATE(F5,"ru","en"))');
+  });
+
+  it('G27: разделитель по локали таблицы — у локалей с десятичной запятой «;», иначе «,»', () => {
+    expect(separatorForLocale('ru_RU')).toBe(';');
+    expect(separatorForLocale('de_DE')).toBe(';');
+    expect(separatorForLocale('uk_UA')).toBe(';');
+    expect(separatorForLocale('en_US')).toBe(',');
+    expect(separatorForLocale('en_GB')).toBe(',');
+    expect(separatorForLocale('ja_JP')).toBe(',');
+    expect(separatorForLocale(undefined)).toBe(',');
+    expect(separatorForLocale('не локаль')).toBe(',');
   });
 });
 

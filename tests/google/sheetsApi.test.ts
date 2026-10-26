@@ -59,6 +59,20 @@ describe('SheetsApi: запросы', () => {
     expect(await api.create('Закупки')).toEqual({ spreadsheetId: 'new1', url: 'https://docs.google.com/spreadsheets/d/new1/edit' });
     expect(await api.getMeta('new1')).toEqual({ title: 'Закупки', sheets: [{ title: 'Заказы', sheetId: 7, hidden: true }, { title: 'Курсы', sheetId: 8, hidden: false }] });
   });
+
+  it('G27: getMeta запрашивает и отдаёт локаль таблицы', async () => {
+    const { api, fetchMock } = setup([json(200, { properties: { title: 'Т', locale: 'ru_RU' }, sheets: [] })]);
+    const meta = await api.getMeta('sp1');
+    expect(meta.locale).toBe('ru_RU');
+    expect(urlOf(fetchMock, 0).searchParams.get('fields')).toContain('properties.locale');
+  });
+
+  it('G27: batchGet с valueRenderOption FORMULA читает текст формул', async () => {
+    const { api, fetchMock } = setup([json(200, { valueRanges: [{ values: [['=1+1']] }] })]);
+    expect(await api.batchGet('sp1', ["'Позиции'"], { valueRenderOption: 'FORMULA' })).toEqual([[['=1+1']]]);
+    expect(urlOf(fetchMock, 0).searchParams.get('valueRenderOption')).toBe('FORMULA');
+    expect(initOf(fetchMock, 0).method).toBe('GET');
+  });
 });
 
 describe('SheetsApi: повторы и токен', () => {

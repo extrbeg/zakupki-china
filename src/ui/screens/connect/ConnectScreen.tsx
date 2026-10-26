@@ -4,6 +4,7 @@
 // или поле «Ссылка на таблицу» (есть доступ — привязка сразу; нет — окно Google с этим файлом, привязка после «Выбрать»).
 // Окно Google, закрывшееся без ответа, не держит экран в ожидании: развилка возвращается с подсказкой, поздний ответ принимается.
 // При привязке таблица приводится к схеме и в неё ставится скрипт; итог скрипта показывается с инструкцией.
+// Там же — выбор «Разделитель аргументов в формулах» (отмечен по локали таблицы); выбор пишется в «Настройки» при «Начать работу».
 
 import { useCallback, useRef, useState } from 'react';
 import { useSession } from '../../DataContext';
@@ -15,6 +16,10 @@ import { SheetsStore } from '../../../store/sheetsStore';
 import { StoreError } from '../../../store/types';
 import { bindSpreadsheet, createAndBind, googleSheetsApi, openLinkedSpreadsheet, restoreBinding, spreadsheetUrl } from '../../../setup/connect';
 import { installScript, type ScriptInstallResult } from '../../../setup/installScript';
+import { applyFormulaSeparator } from '../../../setup/formulaSeparator';
+import type { FormulaSeparator } from '../../../store/schema';
+import type { BindResult } from '../../../setup/connect';
+import { FormulaSeparatorChoice } from './FormulaSeparatorChoice';
 import { AppSpreadsheetList, PICKER_STALL_TEXT } from './AppSpreadsheetList';
 import { ScriptStatus } from './ScriptStatus';
 import { SheetLinkField } from './SheetLinkField';
@@ -23,7 +28,7 @@ type Phase =
   | { k: 'signedOut' }
   | { k: 'busy'; text: string }
   | { k: 'choose'; email: string }
-  | { k: 'done'; email: string; spreadsheetId: string; script: ScriptInstallResult };
+  | { k: 'done'; email: string; spreadsheetId: string; script: ScriptInstallResult; localeSep: FormulaSeparator; sep: FormulaSeparator };
 
 interface Failure { error: unknown; message?: string; retry: () => void }
 
@@ -74,15 +79,23 @@ export default function ConnectScreen() {
     else setPhase({ k: 'choose', email });
   });
 
+  const doneOf = (email: string, res: BindResult): Phase => ({
+    k: 'done', email, spreadsheetId: res.spreadsheetId, script: res.script, localeSep: res.formulaSeparator.locale, sep: res.formulaSeparator.locale,
+  });
+
   const onCreate = (email: string) => run('Создаю таблицу и настраиваю листы…', async () => {
-    const res = await createAndBind(googleSheetsApi(), email);
-    setPhase({ k: 'done', email, spreadsheetId: res.spreadsheetId, script: res.script });
+    setPhase(doneOf(email, await createAndBind(googleSheetsApi(), email)));
+  });
+
+  /** «Начать работу»: выбранный разделитель — в «Настройки» (формулы перевода переписываются), затем приложение. */
+  const onStart = (p: Extract<Phase, { k: 'done' }>) => run('Сохраняю разделитель формул…', async () => {
+    await applyFormulaSeparator(googleSheetsApi(), p.spreadsheetId, p.sep);
+    open(p.email, p.spreadsheetId);
   });
 
   const bindPicked = async (email: string, picked: { id: string; name: string }) => {
     setPhase({ k: 'busy', text: `Настраиваю таблицу «${picked.name}»…` });
-    const res = await bindSpreadsheet(googleSheetsApi(), email, picked.id);
-    setPhase({ k: 'done', email, spreadsheetId: res.spreadsheetId, script: res.script });
+    setPhase(doneOf(email, await bindSpreadsheet(googleSheetsApi(), email, picked.id)));
   };
 
   /** Окно Google (весь список или файл по ссылке без доступа). Закрылось без ответа — развилка с подсказкой. */
@@ -173,8 +186,9 @@ export default function ConnectScreen() {
         <div>
           <p><strong>Таблица подключена.</strong> Листы и колонки созданы.</p>
           <ScriptStatus result={phase.script} spreadsheetUrl={spreadsheetUrl(phase.spreadsheetId)} busy={scriptBusy} onRetry={() => void retryScript(phase)} />
+          <FormulaSeparatorChoice value={phase.sep} locale={phase.localeSep} onChange={(sep) => setPhase({ ...phase, sep })} />
           <p>
-            <button type="button" className="btn btn--primary" onClick={() => open(phase.email, phase.spreadsheetId)}>
+            <button type="button" className="btn btn--primary" onClick={() => onStart(phase)}>
               {phase.script.ok ? 'Начать работу' : 'Продолжить без скрипта'}
             </button>
           </p>

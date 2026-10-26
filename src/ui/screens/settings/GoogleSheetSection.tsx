@@ -2,6 +2,7 @@
 // Подключена таблица: название, «Открыть таблицу», «Сменить таблицу», «Ваши таблицы приложения» (касание — привязка без окна
 // Google, G19), поле «Ссылка на таблицу» (есть доступ — привязка сразу; нет — окно Google с этим файлом → «Выбрать»; привязка
 // с теми же проверками, что на экране подключения), «Импорт из старой таблицы», переустановка скрипта.
+// После привязки другой таблицы — шаг «Разделитель аргументов в формулах» (G27), выбор пишется в её «Настройки» при «Начать работу».
 // Окно Google, закрывшееся без ответа, не держит поле в ожидании: подсказка, поле снова активно, поздний ответ принимается.
 // Демо: пояснение, где настроить вход (docs/setup.md), и «Войти и подключить», если Google настроен.
 
@@ -16,6 +17,9 @@ import { SheetsStore } from '../../../store/sheetsStore';
 import { StoreError } from '../../../store/types';
 import { bindSpreadsheet, googleSheetsApi, openLinkedSpreadsheet, spreadsheetUrl } from '../../../setup/connect';
 import { installScript, type ScriptInstallResult } from '../../../setup/installScript';
+import { applyFormulaSeparator } from '../../../setup/formulaSeparator';
+import type { FormulaSeparator } from '../../../store/schema';
+import { FormulaSeparatorChoice } from '../connect/FormulaSeparatorChoice';
 import { AppSpreadsheetList, PICKER_STALL_TEXT } from '../connect/AppSpreadsheetList';
 import { ScriptStatus } from '../connect/ScriptStatus';
 import { SheetLinkField } from '../connect/SheetLinkField';
@@ -25,7 +29,7 @@ type LinkPhase =
   | { k: 'idle' }
   | { k: 'busy'; text: string }
   | { k: 'same' }
-  | { k: 'done'; spreadsheetId: string; name: string; script: ScriptInstallResult };
+  | { k: 'done'; spreadsheetId: string; name: string; script: ScriptInstallResult; localeSep: FormulaSeparator; sep: FormulaSeparator };
 
 function failureText(e: unknown): string | undefined {
   if (e instanceof AuthError) return `Вход не выполнен: ${e.message}`;
@@ -94,7 +98,8 @@ function Connected({ email, spreadsheetId }: { email: string; spreadsheetId: str
         if (picked.id === spreadsheetId) { setPhase({ k: 'same' }); return; }
         setPhase({ k: 'busy', text: `Настраиваю таблицу «${picked.name}»…` });
         const res = await bindSpreadsheet(googleSheetsApi(), email, picked.id);
-        setPhase({ k: 'done', spreadsheetId: res.spreadsheetId, name: picked.name, script: res.script });
+        const localeSep = res.formulaSeparator.locale;
+        setPhase({ k: 'done', spreadsheetId: res.spreadsheetId, name: picked.name, script: res.script, localeSep, sep: localeSep });
       } catch (e) {
         if (!isCurrent()) return;
         setPhase({ k: 'idle' });
@@ -122,6 +127,22 @@ function Connected({ email, spreadsheetId }: { email: string; spreadsheetId: str
   };
 
   const open = (id: string) => startSheets(new SheetsStore(googleSheetsApi(), id), { email, spreadsheetId: id });
+
+  /** «Начать работу»: выбранный разделитель — в «Настройки» новой таблицы, затем работа с ней. Сбой — баннер с повтором. */
+  const [startError, setStartError] = useState<unknown>(null);
+  const [starting, setStarting] = useState(false);
+  const start = async (p: Extract<LinkPhase, { k: 'done' }>) => {
+    setStarting(true);
+    setStartError(null);
+    try {
+      await applyFormulaSeparator(googleSheetsApi(), p.spreadsheetId, p.sep);
+      open(p.spreadsheetId);
+    } catch (e) {
+      setStartError(e);
+    } finally {
+      setStarting(false);
+    }
+  };
 
   const retryNewScript = async (p: Extract<LinkPhase, { k: 'done' }>) => {
     setScriptBusy(true);
@@ -167,8 +188,10 @@ function Connected({ email, spreadsheetId }: { email: string; spreadsheetId: str
         <div className="ui-card">
           <p><strong>Таблица «{phase.name}» подключена.</strong> Листы и колонки созданы.</p>
           <ScriptStatus result={phase.script} spreadsheetUrl={spreadsheetUrl(phase.spreadsheetId)} busy={scriptBusy} onRetry={() => void retryNewScript(phase)} />
+          <FormulaSeparatorChoice value={phase.sep} locale={phase.localeSep} disabled={starting} onChange={(sep) => setPhase({ ...phase, sep })} />
+          {startError ? <ErrorBanner error={startError} message={failureText(startError)} onRetry={() => void start(phase)} /> : null}
           <p>
-            <button type="button" className="btn btn--primary" onClick={() => open(phase.spreadsheetId)}>
+            <button type="button" className="btn btn--primary" disabled={starting} onClick={() => void start(phase)}>
               {phase.script.ok ? 'Начать работу' : 'Продолжить без скрипта'}
             </button>
           </p>

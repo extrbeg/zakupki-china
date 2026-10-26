@@ -1,15 +1,21 @@
 // Фейковый SheetsApi в памяти: ведёт себя как Sheets API v4 в тех местах, на которые опирается приложение.
 // - batchGet обрезает пустой хвост строк и пустые строки в конце, пустые ячейки внутри — '';
 // - update: null — ячейка не трогается, '' — очищается; выход за указанный диапазон — 400;
-// - USER_ENTERED строка с '=' — формула; формула перевода вычисляется как «[en] <значение>»;
+// - USER_ENTERED строка с '=' — формула; формула перевода вычисляется как «[en] <значение>», если её разделитель
+//   подходит локали таблицы (en_* — «,», прочие — «;»), иначе «#ERROR!» (как ошибка разбора в Sheets);
+// - локаль: seed — en_US (или setLocale), create — ru_RU, как createSheetsApi; getMeta отдаёт её;
+// - batchGet с valueRenderOption FORMULA отдаёт текст формул;
 // - несуществующий лист — 400; deleteDimension сдвигает строки.
 
-import { GoogleApiError, type SheetMeta, type SheetsApi, type WriteOptions } from '../../src/google/sheetsApi';
+import { GoogleApiError, type ReadOptions, type SheetMeta, type SheetsApi, type WriteOptions } from '../../src/google/sheetsApi';
 
 type Stored = string | number | boolean | { formula: string } | undefined;
 interface FakeSheet { sheetId: number; hidden: boolean; grid: Stored[][]; formats: Record<number, string> }
-interface FakeSpreadsheet { title: string; sheets: Map<string, FakeSheet> }
-export interface FakeCall { method: keyof SheetsApi; range?: string; ranges?: string[]; values?: unknown[][]; input?: string; requests?: object[] }
+interface FakeSpreadsheet { title: string; locale: string; sheets: Map<string, FakeSheet> }
+export interface FakeCall { method: keyof SheetsApi; range?: string; ranges?: string[]; values?: unknown[][]; input?: string; requests?: object[]; render?: string }
+
+/** Разделитель аргументов формул в локали фейка: англоязычные — «,», остальные (ru_RU, de_DE…) — «;». */
+const localeSep = (locale: string) => (/^en(_|$)/.test(locale) ? ',' : ';');
 
 const colIndex = (letters: string) => [...letters].reduce((n, ch) => n * 26 + (ch.charCodeAt(0) - 64), 0) - 1;
 
@@ -48,26 +54,33 @@ export class FakeSheetsApi implements SheetsApi {
 
   /** Создать таблицу с листами и значениями (для подготовки теста). */
   seed(id: string, sheets: Record<string, unknown[][]>, title = 'Тест'): void {
-    const book: FakeSpreadsheet = { title, sheets: new Map() };
+    const book: FakeSpreadsheet = { title, locale: 'en_US', sheets: new Map() };
     for (const [name, rows] of Object.entries(sheets)) {
       book.sheets.set(name, { sheetId: this.nextSheetId++, hidden: false, grid: rows.map((r) => r.map((v) => (v === null ? undefined : (v as Stored)))), formats: {} });
     }
     this.books.set(id, book);
   }
 
+  /** Локаль таблицы (properties.locale). */
+  setLocale(id: string, locale: string): void {
+    this.book(id).locale = locale;
+  }
+
   /** Сырые значения листа: что видит пользователь (формулы — вычисленные). */
   values(id: string, sheet: string): unknown[][] {
     const s = this.sheet(id, sheet);
-    return this.trim(s.grid.map((row, r) => row.map((_, c) => this.read(s, r, c))));
+    const sep = localeSep(this.book(id).locale);
+    return this.trim(s.grid.map((row, r) => row.map((_, c) => this.read(s, r, c, sep))));
   }
 
   /** Записанные ячейки без обрезки: явно очищенная ('') — null, никогда не писанный хвост строки отброшен. */
   writtenRows(id: string, sheet: string): unknown[][] {
     const s = this.sheet(id, sheet);
+    const sep = localeSep(this.book(id).locale);
     return s.grid.map((row) => {
       let n = row.length;
       while (n > 0 && row[n - 1] === undefined) n--;
-      return row.slice(0, n).map((v, c) => (v === '' || v === undefined ? null : this.read(s, s.grid.indexOf(row), c)));
+      return row.slice(0, n).map((v, c) => (v === '' || v === undefined ? null : this.read(s, s.grid.indexOf(row), c, sep)));
     });
   }
 
@@ -101,6 +114,7 @@ export class FakeSheetsApi implements SheetsApi {
     this.guard({ method: 'create' });
     const id = `fake_${this.nextBook++}`;
     this.seed(id, { 'Лист1': [] }, title);
+    this.setLocale(id, 'ru_RU');
     return { spreadsheetId: id, url: `https://docs.google.com/spreadsheets/d/${id}/edit` };
   }
 
@@ -108,11 +122,13 @@ export class FakeSheetsApi implements SheetsApi {
     this.guard({ method: 'getMeta' });
     const book = this.book(id);
     const sheets: SheetMeta[] = [...book.sheets.entries()].map(([title, s]) => ({ title, sheetId: s.sheetId, hidden: s.hidden }));
-    return { title: book.title, sheets };
+    return { title: book.title, locale: book.locale, sheets };
   }
 
-  async batchGet(id: string, ranges: string[]) {
-    this.guard({ method: 'batchGet', ranges });
+  async batchGet(id: string, ranges: string[], options?: ReadOptions) {
+    const render = options?.valueRenderOption ?? 'UNFORMATTED_VALUE';
+    this.guard({ method: 'batchGet', ranges, render });
+    const sep = localeSep(this.book(id).locale);
     return ranges.map((range) => {
       const p = parseRange(range);
       const s = this.sheet(id, p.sheet);
@@ -122,7 +138,10 @@ export class FakeSheetsApi implements SheetsApi {
         const row = s.grid[r] ?? [];
         const lastCol = Math.min(p.c2, row.length - 1);
         const vals: unknown[] = [];
-        for (let c = p.c1; c <= lastCol; c++) vals.push(this.read(s, r, c));
+        for (let c = p.c1; c <= lastCol; c++) {
+          const v = row[c];
+          vals.push(render === 'FORMULA' && typeof v === 'object' && v ? v.formula : this.read(s, r, c, sep));
+        }
         out.push(vals);
       }
       return this.trim(out);
@@ -220,13 +239,14 @@ export class FakeSheetsApi implements SheetsApi {
     });
   }
 
-  private read(s: FakeSheet, r: number, c: number): unknown {
+  private read(s: FakeSheet, r: number, c: number, sep: string): unknown {
     const v = s.grid[r]?.[c];
     if (v === undefined) return '';
     if (typeof v !== 'object') return v;
-    const m = /^=IF\(ISBLANK\(([A-Z]+)(\d+)\),"",GOOGLETRANSLATE\(\1\2,"ru","en"\)\)$/.exec(v.formula);
+    const m = /^=IF\(ISBLANK\(([A-Z]+)(\d+)\)([,;])""\3GOOGLETRANSLATE\(\1\2\3"ru"\3"en"\)\)$/.exec(v.formula);
     if (!m) return v.formula;
-    const src = this.read(s, Number(m[2]) - 1, colIndex(m[1]));
+    if (m[3] !== sep) return '#ERROR!';
+    const src = this.read(s, Number(m[2]) - 1, colIndex(m[1]), sep);
     return src === '' ? '' : `[en] ${String(src)}`;
   }
 

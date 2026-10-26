@@ -166,6 +166,22 @@ describe('раздел «Google-таблица»: без окна Google (G19)',
     expect(vi.mocked(pickSpreadsheet)).not.toHaveBeenCalled();
   });
 
+  it('G27: другая таблица из списка → шаг «Разделитель аргументов в формулах» по локали; выбор пишется в её «Настройки»', async () => {
+    h.fake.seed(NEW_ID, {}, 'Закупки ru');
+    h.fake.setLocale(NEW_ID, 'ru_RU');
+    vi.mocked(listAppSpreadsheets).mockResolvedValueOnce([{ id: NEW_ID, name: 'Закупки ru', modifiedTime: '2026-10-25T09:00:00.000Z' }]);
+    const box = await openSettingsSignedIn();
+    fireEvent.click(await within(box).findByRole('button', { name: /Закупки ru/ }));
+    await within(box).findByTestId('daily-rates-hint');
+    const group = within(box).getByRole('group', { name: 'Разделитель аргументов в формулах' });
+    expect((within(group).getByRole('radio', { name: /Точка с запятой/ }) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(within(group).getByRole('radio', { name: /Запятая/ }));
+    fireEvent.click(within(box).getByRole('button', { name: 'Начать работу' }));
+    await waitFor(() => expect(within(section()).getByRole('link', { name: 'Открыть таблицу' }).getAttribute('href'))
+      .toBe(`https://docs.google.com/spreadsheets/d/${NEW_ID}/edit`));
+    expect(h.fake.values(NEW_ID, 'Настройки').find((r) => r[0] === 'formulaSeparator')?.[1]).toBe(',');
+  });
+
   it('касание уже подключённой таблицы → «Эта таблица уже подключена», ничего не пишется', async () => {
     vi.mocked(listAppSpreadsheets).mockResolvedValueOnce([{ id: OLD_ID, name: 'Закупки 2026', modifiedTime: '2026-10-20T09:00:00.000Z' }]);
     const box = await openSettingsSignedIn();

@@ -6,11 +6,14 @@ export { GoogleApiError } from './errors';
 
 export interface SheetMeta { title: string; sheetId: number; hidden: boolean }
 export interface WriteOptions { valueInputOption?: 'RAW' | 'USER_ENTERED' }
+/** Чтение: по умолчанию значения (UNFORMATTED_VALUE); FORMULA — текст формул в формульных ячейках. */
+export interface ReadOptions { valueRenderOption?: 'UNFORMATTED_VALUE' | 'FORMULA' }
 
 export interface SheetsApi {
   create(title: string): Promise<{ spreadsheetId: string; url: string }>;
-  getMeta(id: string): Promise<{ title: string; sheets: SheetMeta[] }>;
-  batchGet(id: string, ranges: string[]): Promise<unknown[][][]>;
+  /** locale — локаль таблицы (`ru_RU`), от неё зависит разделитель аргументов в формулах. */
+  getMeta(id: string): Promise<{ title: string; locale?: string; sheets: SheetMeta[] }>;
+  batchGet(id: string, ranges: string[], options?: ReadOptions): Promise<unknown[][][]>;
   /** RAW по умолчанию; формулы — `{ valueInputOption: 'USER_ENTERED' }`. null в values — ячейка не трогается. */
   update(id: string, range: string, values: unknown[][], options?: WriteOptions): Promise<void>;
   append(id: string, range: string, values: unknown[][]): Promise<void>;
@@ -35,20 +38,21 @@ export function createSheetsApi(getToken: TokenGetter, options: RequestOptions =
     },
 
     async getMeta(id) {
-      const fields = 'properties.title,sheets.properties(title,sheetId,hidden)';
-      const res = await req<{ properties?: { title?: string }; sheets?: { properties?: { title?: string; sheetId?: number; hidden?: boolean } }[] }>(
+      const fields = 'properties.title,properties.locale,sheets.properties(title,sheetId,hidden)';
+      const res = await req<{ properties?: { title?: string; locale?: string }; sheets?: { properties?: { title?: string; sheetId?: number; hidden?: boolean } }[] }>(
         'GET', `${sp(id)}?${query([['fields', fields]])}`,
       );
       return {
         title: res.properties?.title ?? '',
+        ...(res.properties?.locale ? { locale: res.properties.locale } : {}),
         sheets: (res.sheets ?? []).map((s) => ({ title: s.properties?.title ?? '', sheetId: s.properties?.sheetId ?? 0, hidden: Boolean(s.properties?.hidden) })),
       };
     },
 
-    async batchGet(id, ranges) {
+    async batchGet(id, ranges, opts) {
       const params: [string, string][] = [
         ...ranges.map((r): [string, string] => ['ranges', r]),
-        ['valueRenderOption', 'UNFORMATTED_VALUE'],
+        ['valueRenderOption', opts?.valueRenderOption ?? 'UNFORMATTED_VALUE'],
         ['dateTimeRenderOption', 'SERIAL_NUMBER'],
         ['majorDimension', 'ROWS'],
       ];

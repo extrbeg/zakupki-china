@@ -5,3 +5,4 @@ export { getBinding, setBinding } from './binding';
 export { bindSpreadsheet, createAndBind, restoreBinding, googleSheetsApi, spreadsheetUrl, type BindResult } from './connect';
 export { ensureGeography, type GeoSeedReport } from './geography';
 export { DEFAULT_COST_TYPES, DEFAULT_SETTINGS } from './defaults';
+export { syncFormulaSeparator, applyFormulaSeparator, FORMULA_SEPARATOR_OPTIONS, type SeparatorState } from './formulaSeparator';

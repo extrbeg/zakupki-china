@@ -297,3 +297,38 @@ describe('телефон: подключение без окна Google (G19)', 
     expect(getBinding('user@example.com')).toBe('sp_late');
   });
 });
+
+describe('шаг «Разделитель аргументов в формулах» при привязке (G27)', () => {
+  const choice = () => screen.getByRole('group', { name: 'Разделитель аргументов в формулах' });
+  const radio = (name: RegExp) => within(choice()).getByRole('radio', { name }) as HTMLInputElement;
+  const settingIn = (id: string) => {
+    const rows = h.fake.values(id, 'Настройки');
+    return rows.find((r) => r[0] === 'formulaSeparator')?.[1];
+  };
+
+  it('новая таблица (русская локаль): отмечена точка с запятой; выбор запятой пишется в «Настройки» при «Начать работу»', async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Войти через Google' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Создать новую таблицу' }));
+    await screen.findByTestId('daily-rates-hint');
+    expect(radio(/Точка с запятой/).checked).toBe(true);
+    expect(radio(/Запятая/).checked).toBe(false);
+    expect(within(choice()).getByText(/русским языком/)).toBeTruthy();
+    fireEvent.click(radio(/Запятая/));
+    fireEvent.click(screen.getByRole('button', { name: 'Начать работу' }));
+    expect(await screen.findByText('user@example.com', { selector: '.app__user' })).toBeTruthy();
+    expect(settingIn(getBinding('user@example.com')!)).toBe(',');
+  });
+
+  it('выбранная таблица с английской локалью: отмечена запятая; без изменения выбор сохраняется как есть', async () => {
+    h.fake.seed('sp_picked', {});
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Войти через Google' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Выбрать существующую' }));
+    await screen.findByTestId('daily-rates-hint');
+    expect(radio(/Запятая/).checked).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Начать работу' }));
+    expect(await screen.findByText('user@example.com', { selector: '.app__user' })).toBeTruthy();
+    expect(settingIn('sp_picked')).toBe(',');
+  });
+});

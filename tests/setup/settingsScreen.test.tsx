@@ -9,6 +9,7 @@ import { SheetsStore } from '../../src/store/sheetsStore';
 import { StoreError, type Store } from '../../src/store/types';
 import { ensureSchema } from '../../src/setup/ensureSchema';
 import { FakeSheetsApi } from '../store/sheetsStoreFake';
+import { sampleLine } from '../store/contract';
 
 function renderWith(store: Store) {
   return render(
@@ -38,6 +39,37 @@ describe('экран настроек', () => {
     await screen.findByText('Сохранено');
     const rows = Object.fromEntries(fake.values('sp', 'Настройки').slice(1).map((r) => [r[0], r[1]]));
     expect(rows).toMatchObject({ bitrixPortalUrl: 'https://demo.bitrix24.ru', vatRateDefault: '20', ratesSourceUrl: 'https://example.com/rates' });
+  });
+
+  it('G27: «Разделитель в формулах» — смена сохраняется и переписывает формулы перевода в «Позициях»', async () => {
+    const fake = new FakeSheetsApi();
+    fake.seed('sp', {});
+    await ensureSchema(fake, 'sp');
+    const prep = new SheetsStore(fake, 'sp');
+    await prep.setSetting('formulaSeparator', ',');
+    await prep.insert('lines', sampleLine);
+    fake.setLocale('sp', 'ru_RU');   // формула с «,» в русской таблице не работает
+    renderWith(new SheetsStore(fake, 'sp'));
+    const select = await screen.findByLabelText('Разделитель в формулах') as HTMLSelectElement;
+    await waitFor(() => expect(select.value).toBe(','));
+    expect(select.selectedOptions[0].textContent).toBe('Запятая ( , )');
+    fireEvent.change(select, { target: { value: ';' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await screen.findByText('Сохранено');
+    const rows = Object.fromEntries(fake.values('sp', 'Настройки').slice(1).map((r) => [r[0], r[1]]));
+    expect(rows.formulaSeparator).toBe(';');
+    const lines = fake.values('sp', 'Позиции');
+    expect(lines[1][(lines[0] as string[]).indexOf('Name EN (авто)')]).toBe('[en] Кран шаровой');
+  });
+
+  it('G27: в демо-режиме разделитель просто сохраняется в настройках', async () => {
+    const store = new LocalStore('zk:test:settings-sep', { settings: { vatRateDefault: '22' } });
+    renderWith(store);
+    const select = await screen.findByLabelText('Разделитель в формулах') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: ';' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await screen.findByText('Сохранено');
+    expect((await store.load()).settings.formulaSeparator).toBe(';');
   });
 
   it('неверная ставка НДС — ошибка у поля, ничего не пишется', async () => {

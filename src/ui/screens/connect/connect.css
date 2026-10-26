@@ -17,3 +17,7 @@
 .app-sheets__item[aria-current='true'] { border-color: var(--c-primary); }
 .app-sheets__name { font-weight: 600; overflow-wrap: anywhere; }
 .app-sheets__current { color: var(--c-primary); }
+
+/* Шаг «Разделитель аргументов в формулах»: варианты столбиком. */
+.separator-choice { margin: 12px 0; padding: 8px 12px; max-width: 40rem; border: 1px solid var(--c-border); border-radius: var(--radius); display: grid; gap: 4px; }
+.separator-choice legend { font-weight: 600; padding: 0 4px; }

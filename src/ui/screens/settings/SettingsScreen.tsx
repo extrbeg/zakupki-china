@@ -1,27 +1,38 @@
 // Экран «Настройки» (маршрут /settings): раздел «Google-таблица» (всегда; GoogleSheetSection),
-// параметры листа «Настройки» (портал Битрикс24, ставка НДС по умолчанию, источник курсов), выход.
+// параметры листа «Настройки» (портал Битрикс24, ставка НДС по умолчанию, источник курсов, разделитель в формулах), выход.
+// Смена разделителя в таблице переписывает формулы перевода во всех строках «Позиций» (G27).
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useData, useSession } from '../../DataContext';
-import { ErrorBanner, FormGrid, NumberField, TextField, isBadNumber } from '../../components';
+import { ErrorBanner, FormGrid, NumberField, SelectField, TextField, isBadNumber } from '../../components';
+import { SheetsStore, parseSeparator } from '../../../store/sheetsStore';
+import type { FormulaSeparator } from '../../../store/schema';
+import type { Store } from '../../../store/types';
+import { FORMULA_SEPARATOR_OPTIONS } from '../../../setup/formulaSeparator';
 import { signOut } from '../../../google/auth';
 import { GoogleSheetSection } from './GoogleSheetSection';
 import { ruDate } from '../../format';
 
-interface Form { bitrixPortalUrl: string; vatRateDefault: number | undefined; ratesSourceUrl: string }
+interface Form { bitrixPortalUrl: string; vatRateDefault: number | undefined; ratesSourceUrl: string; formulaSeparator: FormulaSeparator }
 type Errors = Partial<Record<keyof Form, string>>;
 
 // Отметка «Сохранено» переживает перезагрузку данных (экран на это время размонтируется).
 let savedFlash = false;
 
-function toForm(settings: Record<string, string>): Form {
+/** Действующий разделитель: из «Настройки», иначе тот, что хранилище таблицы определило по локали; в демо — запятая. */
+function currentSeparator(settings: Record<string, string>, store: Store): FormulaSeparator {
+  return parseSeparator(settings.formulaSeparator) ?? (store instanceof SheetsStore ? store.formulaSeparator : null) ?? ',';
+}
+
+function toForm(settings: Record<string, string>, store: Store): Form {
   const vat = settings.vatRateDefault?.trim().replace(',', '.');
   const n = vat ? Number(vat) : NaN;
   return {
     bitrixPortalUrl: settings.bitrixPortalUrl ?? '',
     vatRateDefault: Number.isFinite(n) ? n : undefined,
     ratesSourceUrl: settings.ratesSourceUrl ?? '',
+    formulaSeparator: currentSeparator(settings, store),
   };
 }
 
@@ -40,7 +51,7 @@ function validate(f: Form): Errors {
 export default function SettingsScreen() {
   const { ds, store, reload } = useData();
   const { session, endSession } = useSession();
-  const [form, setForm] = useState<Form>(() => toForm(ds.settings));
+  const [form, setForm] = useState<Form>(() => toForm(ds.settings, store));
   const [dirty, setDirty] = useState(false);
   const [errors, setErrors] = useState<Errors>({});
   const [saveError, setSaveError] = useState<unknown>(null);
@@ -49,8 +60,8 @@ export default function SettingsScreen() {
 
   // Данные пришли или перечитаны — показать их, пока пользователь ничего не правил.
   useEffect(() => {
-    if (!dirty) setForm(toForm(ds.settings));
-  }, [ds.settings, dirty]);
+    if (!dirty) setForm(toForm(ds.settings, store));
+  }, [ds.settings, dirty, store]);
 
   const lastAutoRate = useMemo(
     () => ds.rates.filter((r) => r.source === 'vtb').reduce<string | null>((m, r) => (m === null || r.date > m ? r.date : m), null),
@@ -77,6 +88,11 @@ export default function SettingsScreen() {
     try {
       for (const [k, v] of Object.entries(next)) {
         if ((ds.settings[k] ?? '') !== v) await store.setSetting(k, v);
+      }
+      if (form.formulaSeparator !== currentSeparator(ds.settings, store)) {
+        // в таблице — ещё и переписать формулы перевода; в демо формул нет
+        if (store instanceof SheetsStore) await store.setFormulaSeparator(form.formulaSeparator);
+        else await store.setSetting('formulaSeparator', form.formulaSeparator);
       }
       savedFlash = true;
       setSaved(true);
@@ -118,6 +134,11 @@ export default function SettingsScreen() {
             <TextField
               label="Адрес источника курсов" type="url" value={form.ratesSourceUrl} error={errors.ratesSourceUrl}
               hint="Страница, с которой скрипт таблицы берёт курсы ВТБ; пусто — страница обмена валют ВТБ" onChange={(v) => set('ratesSourceUrl', v)}
+            />
+            <SelectField
+              label="Разделитель в формулах" value={form.formulaSeparator} options={FORMULA_SEPARATOR_OPTIONS}
+              hint="Для формул перевода в листе «Позиции»: в таблице с русским языком — точка с запятой. При смене формулы переписываются"
+              onChange={(v) => set('formulaSeparator', parseSeparator(v) ?? form.formulaSeparator)}
             />
           </FormGrid>
           <p>

@@ -2,6 +2,8 @@
 // и даёт приложению доступ к этому файлу — поэтому нужен VITE_GOOGLE_APP_ID (номер проекта Google Cloud).
 // По ссылке (fileId) окно открывается сразу с этим файлом (DocsView.setFileIds): доступ появляется только после «Выбрать»,
 // область доступа та же — drive.file (ADR 0002).
+// На телефоне и в установленной PWA окно может закрыться, не вернув ответа (G19, история 88): если приложение снова получило
+// фокус, а ответа нет PICKER_STALL_MS, зовётся onStall — экран снимает ожидание; поздний ответ всё равно принимается.
 
 import { getAccessToken } from './auth';
 import { AuthError } from './errors';
@@ -15,6 +17,7 @@ interface PickerBuilder {
   setAppId(id: string): PickerBuilder;
   setLocale(locale: string): PickerBuilder;
   setTitle(title: string): PickerBuilder;
+  setOrigin(origin: string): PickerBuilder;
   setCallback(cb: (data: PickerResult) => void): PickerBuilder;
   build(): { setVisible(v: boolean): void };
 }
@@ -50,9 +53,32 @@ function loadPicker(): Promise<PickerNs> {
   return loading;
 }
 
+/** Сколько ждать ответа окна после возврата фокуса в приложение, мс. */
+export const PICKER_STALL_MS = 4000;
+
 export interface PickOptions {
   /** id файла из ссылки: окно показывает только этот файл. */
   fileId?: string;
+  /** Окно закрылось без ответа: фокус вернулся в приложение, ответа нет PICKER_STALL_MS. Промис остаётся живым. */
+  onStall?: () => void;
+}
+
+/** Следить за возвратом фокуса в приложение, пока окно открыто; возвращает функцию остановки. */
+function watchReturn(onStall: () => void): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const arm = () => {
+    if (timer !== null) return;
+    timer = setTimeout(() => { stop(); onStall(); }, PICKER_STALL_MS);
+  };
+  const onVisible = () => { if (document.visibilityState !== 'hidden') arm(); };
+  const stop = () => {
+    if (timer !== null) clearTimeout(timer);
+    window.removeEventListener('focus', arm);
+    document.removeEventListener('visibilitychange', onVisible);
+  };
+  window.addEventListener('focus', arm);
+  document.addEventListener('visibilitychange', onVisible);
+  return stop;
 }
 
 /** Открыть Picker с таблицами пользователя (или с одним файлом по fileId). Отмена — null. */
@@ -60,7 +86,9 @@ export async function pickSpreadsheet(options: PickOptions = {}): Promise<{ id: 
   const token = await getAccessToken();
   if (!token) throw new AuthError();
   const picker = await loadPicker();
-  return new Promise((resolve) => {
+  return new Promise((done) => {
+    let stopWatch = () => {};
+    const resolve = (v: { id: string; name: string } | null) => { stopWatch(); done(v); };
     const view = new picker.DocsView(picker.ViewId.SPREADSHEETS);
     view.setMimeTypes?.('application/vnd.google-apps.spreadsheet');
     if (options.fileId) view.setFileIds?.(options.fileId);
@@ -69,6 +97,7 @@ export async function pickSpreadsheet(options: PickOptions = {}): Promise<{ id: 
       .setOAuthToken(token)
       .setLocale('ru')
       .setTitle(options.fileId ? 'Подтвердите таблицу — нажмите «Выбрать»' : 'Выберите таблицу «Закупки»')
+      .setOrigin(window.location.origin)
       .setCallback((data) => {
         if (data.action === picker.Action.PICKED && data.docs?.[0]) resolve({ id: data.docs[0].id, name: data.docs[0].name });
         else if (data.action === picker.Action.CANCEL) resolve(null);
@@ -78,5 +107,6 @@ export async function pickSpreadsheet(options: PickOptions = {}): Promise<{ id: 
     if (apiKey) builder = builder.setDeveloperKey(apiKey);
     if (appId) builder = builder.setAppId(appId);
     builder.build().setVisible(true);
+    if (options.onStall) stopWatch = watchReturn(options.onStall);
   });
 }

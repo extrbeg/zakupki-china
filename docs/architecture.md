@@ -17,7 +17,7 @@ SheetsStore → SheetsApi (src/google/sheetsApi.ts) → googleRequest (src/googl
 - Сессия (`SessionProvider`): `none` → экран входа, `demo` → `createDemoStore()` (localStorage, ключ `zk:demo`), `sheets` → store после привязки таблицы. Режим демо помнится в `zk:mode`.
 - Данные грузятся целиком при входе и по `reload()`; фильтры и выборы на экранах — только показ, расчёт себестоимости всегда по всему `Dataset`.
 - Экран «Себестоимость» пишет отчёт в лист `Себестоимость` через `store.writeReport` (лист очищается и пишется целиком).
-- Вход Google: `src/google/auth.ts` (Google Identity Services, токен в памяти), `picker.ts` — выбор таблицы, `scriptApi.ts` — Apps Script API.
+- Вход Google: `src/google/auth.ts` (Google Identity Services, токен в памяти), `picker.ts` — выбор таблицы (с `setOrigin`, защита от окна без ответа), `driveApi.ts` — список таблиц, доступных приложению (`listAppSpreadsheets`), `scriptApi.ts` — Apps Script API. Подключение по ссылке — `openLinkedSpreadsheet` (`src/setup/connect.ts`): сначала прямой доступ, окно Google только при 403/404.
 - Привязка таблицы (`src/setup/connect.ts`): `ensureSchema` приводит листы к схеме → `installScript` ставит скрипт курсов (`apps-script/Code.gs`, `appsscript.json`, импорт `?raw`) → привязка запоминается в localStorage `zk:binding:<email>`. Версия скрипта — хеш исходников (`SCRIPT_VERSION`); при расхождении с `_meta.scriptVersion` скрипт переставляется при следующем входе.
 - Курсы в приложение приходят только через лист `Курсы`: скрипт таблицы ежедневно парсит страницу ВТБ и пишет строки `source=vtb`; руками — `source=manual` (экран «Курсы»).
 - Импорт из старой таблицы (`src/import/`): `readLegacy` (6 видимых листов) → `mapLegacy` (чистая, колонки по заголовкам) → `applyImport` через текущий store.

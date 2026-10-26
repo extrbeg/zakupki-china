@@ -1,18 +1,22 @@
 // Раздел «Google-таблица» в настройках (G14, G15; истории 81, 82) — виден всегда.
-// Подключена таблица: название, «Открыть таблицу», «Сменить таблицу», поле «Ссылка на таблицу» (окно Google с этим файлом →
-// «Выбрать» → привязка с теми же проверками, что на экране подключения), «Импорт из старой таблицы», переустановка скрипта.
+// Подключена таблица: название, «Открыть таблицу», «Сменить таблицу», «Ваши таблицы приложения» (касание — привязка без окна
+// Google, G19), поле «Ссылка на таблицу» (есть доступ — привязка сразу; нет — окно Google с этим файлом → «Выбрать»; привязка
+// с теми же проверками, что на экране подключения), «Импорт из старой таблицы», переустановка скрипта.
+// Окно Google, закрывшееся без ответа, не держит поле в ожидании: подсказка, поле снова активно, поздний ответ принимается.
 // Демо: пояснение, где настроить вход (docs/setup.md), и «Войти и подключить», если Google настроен.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSession } from '../../DataContext';
 import { ErrorBanner } from '../../components';
 import { AuthError } from '../../../google/errors';
-import { pickSpreadsheet } from '../../../google/picker';
+import { pickSpreadsheet, type PickOptions } from '../../../google/picker';
+import type { AppSpreadsheet } from '../../../google/driveApi';
 import { SheetsStore } from '../../../store/sheetsStore';
 import { StoreError } from '../../../store/types';
-import { bindSpreadsheet, googleSheetsApi, spreadsheetUrl } from '../../../setup/connect';
+import { bindSpreadsheet, googleSheetsApi, openLinkedSpreadsheet, spreadsheetUrl } from '../../../setup/connect';
 import { installScript, type ScriptInstallResult } from '../../../setup/installScript';
+import { AppSpreadsheetList, PICKER_STALL_TEXT } from '../connect/AppSpreadsheetList';
 import { ScriptStatus } from '../connect/ScriptStatus';
 import { SheetLinkField } from '../connect/SheetLinkField';
 import { setupDocsUrl } from './settingsLogic';
@@ -62,6 +66,8 @@ function Connected({ email, spreadsheetId }: { email: string; spreadsheetId: str
   const [failure, setFailure] = useState<{ error: unknown; retry: () => void } | null>(null);
   const [script, setScript] = useState<ScriptInstallResult | null>(null);
   const [scriptBusy, setScriptBusy] = useState(false);
+  const [stalled, setStalled] = useState(false);
+  const op = useRef(0);
   const url = spreadsheetUrl(spreadsheetId);
 
   useEffect(() => {
@@ -72,24 +78,47 @@ function Connected({ email, spreadsheetId }: { email: string; spreadsheetId: str
     return () => { live = false; };
   }, [spreadsheetId]);
 
-  const connectByLink = (fileId: string) => {
+  /** Получить таблицу (по ссылке или из списка) и привязать. Поздний ответ окна Google не перебивает начатое после него действие. */
+  const connect = (text: string, obtain: (pick: Pick<PickOptions, 'onStall'>) => Promise<{ id: string; name: string } | null>) => {
     const attempt = async () => {
+      const mine = ++op.current;
+      const isCurrent = () => op.current === mine;
       setFailure(null);
-      if (fileId === spreadsheetId) { setPhase({ k: 'same' }); return; }
-      setPhase({ k: 'busy', text: 'Открываю таблицу в окне Google…' });
+      setStalled(false);
+      setPhase({ k: 'busy', text });
       try {
-        const picked = await pickSpreadsheet({ fileId });
+        const picked = await obtain({ onStall: () => { if (isCurrent()) { setPhase({ k: 'idle' }); setStalled(true); } } });
+        if (!isCurrent()) return;
+        setStalled(false);
         if (!picked) { setPhase({ k: 'idle' }); return; }
         if (picked.id === spreadsheetId) { setPhase({ k: 'same' }); return; }
         setPhase({ k: 'busy', text: `Настраиваю таблицу «${picked.name}»…` });
         const res = await bindSpreadsheet(googleSheetsApi(), email, picked.id);
         setPhase({ k: 'done', spreadsheetId: res.spreadsheetId, name: picked.name, script: res.script });
       } catch (e) {
+        if (!isCurrent()) return;
         setPhase({ k: 'idle' });
         setFailure({ error: e, retry: () => void attempt() });
       }
     };
     void attempt();
+  };
+
+  const markSame = () => {
+    op.current += 1;
+    setFailure(null);
+    setStalled(false);
+    setPhase({ k: 'same' });
+  };
+
+  const connectByLink = (fileId: string) => {
+    if (fileId === spreadsheetId) { markSame(); return; }
+    connect('Открываю таблицу…', (pick) => openLinkedSpreadsheet(fileId, { getMeta: (id) => googleSheetsApi().getMeta(id), pick: pickSpreadsheet }, pick));
+  };
+
+  const connectFromList = (file: AppSpreadsheet) => {
+    if (file.id === spreadsheetId) { markSame(); return; }
+    connect(`Настраиваю таблицу «${file.name}»…`, async () => file);
   };
 
   const open = (id: string) => startSheets(new SheetsStore(googleSheetsApi(), id), { email, spreadsheetId: id });
@@ -147,9 +176,11 @@ function Connected({ email, spreadsheetId }: { email: string; spreadsheetId: str
       ) : (
         <>
           {failure ? <ErrorBanner error={failure.error} message={failureText(failure.error)} onRetry={failure.retry} /> : null}
+          {stalled ? <p className="banner banner--warning" role="status">{PICKER_STALL_TEXT}</p> : null}
+          <AppSpreadsheetList currentId={spreadsheetId} disabled={busy} onSelect={connectFromList} />
           <SheetLinkField
             disabled={busy}
-            hint="Подключить другую таблицу: вставьте ссылку — откроется окно Google с этим файлом, нажмите «Выбрать»"
+            hint="Подключить другую таблицу: вставьте ссылку — если доступа ещё нет, откроется окно Google с этим файлом, нажмите «Выбрать»"
             onSubmit={connectByLink}
           />
           {busy ? <p className="muted" role="status">{phase.text}</p> : null}

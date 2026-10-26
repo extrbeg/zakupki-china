@@ -1,6 +1,8 @@
 // Экран «Подключение таблицы» (маршрут /connect и блок на экране входа).
-// Вход Google → запомненная таблица открывается сразу; иначе — «Создать новую таблицу», «Выбрать существующую»
-// или поле «Ссылка на таблицу» (окно Google открывается сразу с этим файлом, привязка — после «Выбрать»).
+// Вход Google → запомненная таблица открывается сразу; иначе — «Ваши таблицы приложения» (касание — привязка без окна Google,
+// так подключается на телефоне таблица, созданная на компьютере), «Создать новую таблицу», «Выбрать существующую»
+// или поле «Ссылка на таблицу» (есть доступ — привязка сразу; нет — окно Google с этим файлом, привязка после «Выбрать»).
+// Окно Google, закрывшееся без ответа, не держит экран в ожидании: развилка возвращается с подсказкой, поздний ответ принимается.
 // При привязке таблица приводится к схеме и в неё ставится скрипт; итог скрипта показывается с инструкцией.
 
 import { useCallback, useRef, useState } from 'react';
@@ -8,10 +10,12 @@ import { useSession } from '../../DataContext';
 import { ErrorBanner } from '../../components';
 import { AuthError, lastEmail, signIn } from '../../../google/auth';
 import { pickSpreadsheet } from '../../../google/picker';
+import type { AppSpreadsheet } from '../../../google/driveApi';
 import { SheetsStore } from '../../../store/sheetsStore';
 import { StoreError } from '../../../store/types';
-import { bindSpreadsheet, createAndBind, googleSheetsApi, restoreBinding, spreadsheetUrl } from '../../../setup/connect';
+import { bindSpreadsheet, createAndBind, googleSheetsApi, openLinkedSpreadsheet, restoreBinding, spreadsheetUrl } from '../../../setup/connect';
 import { installScript, type ScriptInstallResult } from '../../../setup/installScript';
+import { AppSpreadsheetList, PICKER_STALL_TEXT } from './AppSpreadsheetList';
 import { ScriptStatus } from './ScriptStatus';
 import { SheetLinkField } from './SheetLinkField';
 
@@ -35,15 +39,22 @@ export default function ConnectScreen() {
   const [phase, setPhase] = useState<Phase>(() => (session.mode === 'sheets' ? { k: 'choose', email: session.email } : { k: 'signedOut' }));
   const [failure, setFailure] = useState<Failure | null>(null);
   const [scriptBusy, setScriptBusy] = useState(false);
+  const [stalled, setStalled] = useState(false);
   const before = useRef<Phase>(phase);
+  const op = useRef(0);
 
-  const run = useCallback((text: string, action: () => Promise<void>) => {
+  /** Действие экрана; isCurrent() — после него не начато другое (поздний ответ окна Google не перебивает новое действие). */
+  const run = useCallback((text: string, action: (isCurrent: () => boolean) => Promise<void>) => {
     const attempt = async () => {
+      const mine = ++op.current;
+      const isCurrent = () => op.current === mine;
       setFailure(null);
+      setStalled(false);
       setPhase((p) => { if (p.k !== 'busy') before.current = p; return { k: 'busy', text }; });
       try {
-        await action();
+        await action(isCurrent);
       } catch (e) {
+        if (!isCurrent()) return;
         setPhase(before.current);
         setFailure({ error: e, message: failureText(e), retry: () => void attempt() });
       }
@@ -68,16 +79,33 @@ export default function ConnectScreen() {
     setPhase({ k: 'done', email, spreadsheetId: res.spreadsheetId, script: res.script });
   });
 
-  const onPick = (email: string, fileId?: string) => run(fileId ? 'Открываю таблицу в окне Google…' : 'Открываю выбор таблицы…', async () => {
-    const picked = await pickSpreadsheet(fileId ? { fileId } : undefined);
+  const bindPicked = async (email: string, picked: { id: string; name: string }) => {
+    setPhase({ k: 'busy', text: `Настраиваю таблицу «${picked.name}»…` });
+    const res = await bindSpreadsheet(googleSheetsApi(), email, picked.id);
+    setPhase({ k: 'done', email, spreadsheetId: res.spreadsheetId, script: res.script });
+  };
+
+  /** Окно Google (весь список или файл по ссылке без доступа). Закрылось без ответа — развилка с подсказкой. */
+  const onPick = (email: string, fileId?: string) => run(fileId ? 'Открываю таблицу…' : 'Открываю выбор таблицы…', async (isCurrent) => {
+    const onStall = () => {
+      if (!isCurrent()) return;
+      setPhase({ k: 'choose', email });
+      setStalled(true);
+    };
+    const picked = fileId
+      ? await openLinkedSpreadsheet(fileId, { getMeta: (id) => googleSheetsApi().getMeta(id), pick: pickSpreadsheet }, { onStall })
+      : await pickSpreadsheet({ onStall });
+    if (!isCurrent()) return;
     if (!picked) {
       setPhase({ k: 'choose', email });
       return;
     }
-    setPhase({ k: 'busy', text: `Настраиваю таблицу «${picked.name}»…` });
-    const res = await bindSpreadsheet(googleSheetsApi(), email, picked.id);
-    setPhase({ k: 'done', email, spreadsheetId: res.spreadsheetId, script: res.script });
+    setStalled(false);
+    await bindPicked(email, picked);
   });
+
+  /** «Ваши таблицы приложения»: доступ уже есть — привязка без окна Google. */
+  const onList = (email: string, file: AppSpreadsheet) => run(`Настраиваю таблицу «${file.name}»…`, () => bindPicked(email, file));
 
   const retryScript = async (p: Extract<Phase, { k: 'done' }>) => {
     setScriptBusy(true);
@@ -125,11 +153,19 @@ export default function ConnectScreen() {
           ) : (
             <p className="muted">Подключите таблицу: создайте новую или выберите существующую. В ней сами создадутся листы, колонки и скрипт курсов.</p>
           )}
+          {stalled ? <p className="banner banner--warning" role="status">{PICKER_STALL_TEXT}</p> : null}
+          <AppSpreadsheetList
+            currentId={session.mode === 'sheets' ? session.spreadsheetId : undefined}
+            onSelect={(file) => onList(phase.email, file)}
+          />
           <div className="empty-state__actions">
             <button type="button" className="btn btn--primary" onClick={() => onCreate(phase.email)}>Создать новую таблицу</button>
             <button type="button" className="btn" onClick={() => onPick(phase.email)}>Выбрать существующую</button>
           </div>
-          <SheetLinkField onSubmit={(fileId) => onPick(phase.email, fileId)} />
+          <SheetLinkField
+            hint="Ссылка из адресной строки таблицы или её id — если доступа ещё нет, откроется окно Google, нажмите «Выбрать»"
+            onSubmit={(fileId) => onPick(phase.email, fileId)}
+          />
         </div>
       ) : null}
 

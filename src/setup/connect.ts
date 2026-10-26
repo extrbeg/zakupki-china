@@ -1,9 +1,11 @@
-// Сценарии подключения таблицы: создать новую, привязать выбранную, восстановить привязку при входе.
+// Сценарии подключения таблицы: создать новую, привязать выбранную, восстановить привязку при входе,
+// открыть таблицу по ссылке (сначала напрямую, окно Google — только при отказе в доступе, G19).
 
 import type { SheetsApi } from '../google/sheetsApi';
 import { getAccessToken } from '../google/auth';
 import { createSheetsApi } from '../google/sheetsApi';
 import { GoogleApiError } from '../google/errors';
+import type { PickOptions } from '../google/picker';
 import { toStoreError } from '../store/sheetsStore';
 import { getBinding, setBinding } from './binding';
 import { ensureSchema, NotAppSpreadsheetError, type SchemaReport } from './ensureSchema';
@@ -70,4 +72,30 @@ export async function restoreBinding(api: SheetsApi, email: string, deps?: Scrip
     if (meta.scriptId && meta.scriptVersion !== SCRIPT_VERSION) await installScript(api, spreadsheetId, deps);
   } catch { /* скрипт не обязателен для работы — переустановить можно в настройках */ }
   return spreadsheetId;
+}
+
+export interface LinkedSpreadsheetDeps {
+  /** Прямая проверка доступа: метаданные таблицы по id. */
+  getMeta(id: string): Promise<{ title: string }>;
+  /** Окно Google с этим файлом (pickSpreadsheet). Отмена — null. */
+  pick(options: PickOptions): Promise<{ id: string; name: string } | null>;
+}
+
+/**
+ * Таблица по ссылке: доступ уже есть (создана приложением или выбрана раньше, в том числе на другом устройстве) —
+ * сразу, без окна Google; 403/404 — окно Google с этим файлом (drive.file даёт доступ после «Выбрать»).
+ * Отмена окна — null; прочие сбои проверки — StoreError, окно не открывается.
+ */
+export async function openLinkedSpreadsheet(
+  fileId: string,
+  deps: LinkedSpreadsheetDeps,
+  pickOptions: Omit<PickOptions, 'fileId'> = {},
+): Promise<{ id: string; name: string } | null> {
+  try {
+    const meta = await deps.getMeta(fileId);
+    return { id: fileId, name: meta.title };
+  } catch (e) {
+    if (!(e instanceof GoogleApiError && (e.status === 403 || e.status === 404))) throw toStoreError(e);
+  }
+  return deps.pick({ fileId, ...pickOptions });
 }

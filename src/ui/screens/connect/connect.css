@@ -2,3 +2,18 @@
 .sheet-link { margin: 12px 0; max-width: 40rem; }
 .sheet-link__row { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
 .sheet-link__input { flex: 1 1 16rem; min-width: 0; }
+
+/* «Ваши таблицы приложения»: строка-кнопка на всю ширину, удобная для касания на телефоне. */
+.app-sheets { margin: 12px 0; max-width: 40rem; }
+.app-sheets__title { font-size: 1rem; margin: 0 0 6px; }
+.app-sheets__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.app-sheets__item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 48px;
+  padding: 8px 12px; text-align: left; font: inherit; color: var(--c-text); cursor: pointer;
+  background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius);
+}
+.app-sheets__item:hover:not(:disabled) { border-color: var(--c-primary); }
+.app-sheets__item:disabled { opacity: 0.6; cursor: default; }
+.app-sheets__item[aria-current='true'] { border-color: var(--c-primary); }
+.app-sheets__name { font-weight: 600; overflow-wrap: anywhere; }
+.app-sheets__current { color: var(--c-primary); }

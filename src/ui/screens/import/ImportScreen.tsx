@@ -1,8 +1,9 @@
-// Экран «Импорт из старой таблицы» (маршрут /import): выбор таблицы в Picker (или по ссылке — окно сразу с этим файлом) →
+// Экран «Импорт из старой таблицы» (маршрут /import): выбор таблицы в Picker или по ссылке (есть доступ — сразу,
+// нет — окно Google с этим файлом; G19) →
 // предпросмотр количества и проблем →
 // перенос в подключённую таблицу. В непустую таблицу — только с явным «Добавить к существующим данным».
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useData, useSession } from '../../DataContext';
 import { CheckboxField, EmptyState, ErrorBanner } from '../../components';
@@ -10,13 +11,15 @@ import { applyImport, hasUserData, LEGACY_SHEETS, mapLegacy, readLegacy, type Im
 import { pickSpreadsheet, type PickOptions } from '../../../google/picker';
 import { SheetLinkField } from '../connect/SheetLinkField';
 import { AuthError, GoogleApiError } from '../../../google/errors';
-import { googleSheetsApi } from '../../../setup/connect';
+import { googleSheetsApi, openLinkedSpreadsheet } from '../../../setup/connect';
 import { StoreError, STORE_ERROR_TEXT } from '../../../store/types';
 import './import.css';
 
 export interface ImportDeps {
   /** Выбор таблицы (Picker); с fileId — окно с этим файлом. Отмена — null. */
   pick(options?: PickOptions): Promise<{ id: string; name: string } | null>;
+  /** Прямая проверка доступа к файлу по ссылке (getMeta). Нет — ссылка сразу открывает окно Google. */
+  getMeta?(spreadsheetId: string): Promise<{ title: string }>;
   /** Чтение видимых листов старой таблицы. */
   read(spreadsheetId: string): Promise<LegacyRaw>;
   /** Подключённая таблица — из неё импортировать нельзя. */
@@ -28,6 +31,9 @@ const STAT_LABEL: [key: string, label: string][] = [
   ['costs', 'Затраты'], ['rates', 'Курсы'], ['cities', 'Города'], ['lists', 'Значения списков'],
   ['agents', 'Платёжные агенты'], ['carriers', 'Перевозчики'], ['shipments', 'Поставки'], ['batches', 'Партии'],
 ];
+
+/** Окно Google закрылось без ответа (фокус вернулся в приложение). */
+export const IMPORT_PICKER_STALL_TEXT = 'Окно выбора не вернуло таблицу — попробуйте ещё раз или вставьте ссылку';
 
 function errorText(e: unknown): string {
   if (e instanceof StoreError) return STORE_ERROR_TEXT[e.kind];
@@ -84,19 +90,30 @@ export function ImportFlow({ deps }: { deps: ImportDeps }) {
   const [step, setStep] = useState<Step>({ kind: 'idle' });
   const [error, setError] = useState<string | null>(null);
   const [append, setAppend] = useState(false);
+  const [stalled, setStalled] = useState(false);
+  const op = useRef(0);
   const nonEmpty = hasUserData(ds);
   const busy = step.kind === 'reading' || step.kind === 'importing';
 
   const choose = async (fileId?: string) => {
+    const mine = ++op.current;
+    const isCurrent = () => op.current === mine;
     setError(null);
     setAppend(false);
+    setStalled(false);
+    const onStall = () => { if (isCurrent()) setStalled(true); };
     let picked: { id: string; name: string } | null;
     try {
-      picked = await (fileId ? deps.pick({ fileId }) : deps.pick());
+      if (!fileId) picked = await deps.pick({ onStall });
+      else if (deps.getMeta) picked = await openLinkedSpreadsheet(fileId, { getMeta: deps.getMeta, pick: deps.pick }, { onStall });
+      else picked = await deps.pick({ fileId, onStall });
     } catch (e) {
+      if (!isCurrent()) return;
       setError(errorText(e));
       return;
     }
+    if (!isCurrent()) return;   // после зависшего окна начат другой выбор — поздний ответ не перебивает его
+    setStalled(false);
     if (!picked) return;
     if (picked.id === deps.currentSpreadsheetId) {
       setError('Это подключённая таблица приложения — выберите старую таблицу «Закупки Китай AREC»');
@@ -141,6 +158,7 @@ export function ImportFlow({ deps }: { deps: ImportDeps }) {
       </p>
 
       {error ? <ErrorBanner message={error} /> : null}
+      {stalled ? <p className="banner banner--warning" role="status">{IMPORT_PICKER_STALL_TEXT}</p> : null}
 
       <div className="ui-toolbar import__actions">
         <button type="button" className={`btn${step.kind === 'idle' ? ' btn--primary' : ''}`} onClick={() => void choose()} disabled={busy || status === 'loading'}>
@@ -148,7 +166,7 @@ export function ImportFlow({ deps }: { deps: ImportDeps }) {
         </button>
         <SheetLinkField
           label="Ссылка на старую таблицу" button="Открыть по ссылке" disabled={busy || status === 'loading'}
-          hint="Или вставьте ссылку на старую таблицу — откроется окно Google с ней, нажмите «Выбрать»"
+          hint="Или вставьте ссылку на старую таблицу — если доступа ещё нет, откроется окно Google с ней, нажмите «Выбрать»"
           onSubmit={(fileId) => void choose(fileId)}
         />
       </div>
@@ -213,6 +231,7 @@ export default function ImportScreen() {
   const spreadsheetId = session.mode === 'sheets' ? session.spreadsheetId : undefined;
   const deps = useMemo<ImportDeps>(() => ({
     pick: pickSpreadsheet,
+    getMeta: (id) => googleSheetsApi().getMeta(id),
     read: (id) => readLegacy(googleSheetsApi(), id),
     currentSpreadsheetId: spreadsheetId,
   }), [spreadsheetId]);

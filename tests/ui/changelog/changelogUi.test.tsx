@@ -19,7 +19,7 @@ describe('экран «Что нового»', () => {
     inRouter(<ChangelogScreen />);
     const versions = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
     expect(versions).toEqual([
-      'Версия 0.7.0 · 26.10.2026', 'Версия 0.6.1 · 26.10.2026', 'Версия 0.6.0 · 26.10.2026', 'Версия 0.5.0 · 26.10.2026', 'Версия 0.4.0 · 26.10.2026',
+      'Версия 0.7.1 · 26.10.2026', 'Версия 0.7.0 · 26.10.2026', 'Версия 0.6.1 · 26.10.2026', 'Версия 0.6.0 · 26.10.2026', 'Версия 0.5.0 · 26.10.2026', 'Версия 0.4.0 · 26.10.2026',
       'Версия 0.3.0 · 26.10.2026', 'Версия 0.2.0 · 26.10.2026', 'Версия 0.1.0 · 25.10.2026',
     ]);
     const v60 = screen.getByRole('region', { name: /Версия 0\.6\.0/ });
@@ -35,13 +35,13 @@ describe('плашка «Приложение обновлено»', () => {
   it('при первом запуске вообще не показывается, но версия запоминается', () => {
     inRouter(<WhatsNewBanner />);
     expect(screen.queryByText(/Приложение обновлено/)).toBeNull();
-    expect(localStorage.getItem(SEEN_VERSION_KEY)).toBe('0.7.0');
+    expect(localStorage.getItem(SEEN_VERSION_KEY)).toBe('0.7.1');
   });
 
   it('после обновления: показывает, раскрывает список, закрывается и больше не появляется', () => {
     localStorage.setItem(SEEN_VERSION_KEY, '0.4.0');
     const { unmount } = inRouter(<WhatsNewBanner />);
-    expect(screen.getByRole('status').textContent).toContain('Приложение обновлено до 0.7.0');
+    expect(screen.getByRole('status').textContent).toContain('Приложение обновлено до 0.7.1');
     expect(screen.queryByText(/Вся история/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /что нового/i }));
     expect(screen.getByText(/«\+ Добавить…»/)).toBeTruthy();
@@ -50,7 +50,7 @@ describe('плашка «Приложение обновлено»', () => {
     expect(screen.getByRole('link', { name: /Вся история/ }).getAttribute('href')).toBe('/changelog');
     fireEvent.click(screen.getByRole('button', { name: 'Закрыть' }));
     expect(screen.queryByText(/Приложение обновлено/)).toBeNull();
-    expect(localStorage.getItem(SEEN_VERSION_KEY)).toBe('0.7.0');
+    expect(localStorage.getItem(SEEN_VERSION_KEY)).toBe('0.7.1');
     unmount();
     inRouter(<WhatsNewBanner />);
     expect(screen.queryByText(/Приложение обновлено/)).toBeNull();
@@ -90,7 +90,7 @@ describe('оболочка', () => {
   it('внизу меню — версия и дата со ссылкой на «Что нового»; пункт меню «Что нового» открывает экран', async () => {
     renderShell();
     const nav = await screen.findByRole('navigation', { name: 'Разделы' });
-    const footer = within(nav).getByRole('link', { name: 'Версия 0.7.0 · 26.10.2026' });
+    const footer = within(nav).getByRole('link', { name: 'Версия 0.7.1 · 26.10.2026' });
     expect(footer.getAttribute('href')).toBe('/changelog');
     fireEvent.click(within(nav).getByRole('link', { name: 'Что нового' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Что нового' })).toBeTruthy();

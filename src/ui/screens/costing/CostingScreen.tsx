@@ -30,7 +30,7 @@ function LineDetail({ row, shipmentNumber }: { row: CostingRow; shipmentNumber: 
               <tr key={k}><th scope="row">{COST_CATEGORY_LABEL[k]}</th><td className="costing-num">{money(c.breakdown[k])}</td></tr>
             ))}
             <tr><th scope="row">Итого</th><td className="costing-num">{money(c.total)}</td></tr>
-            <tr><th scope="row">Средневзвешенная за единицу (AV)</th><td className="costing-num">{money(c.AV)}</td></tr>
+            <tr><th scope="row">Себестоимость за единицу (средневзвешенная)</th><td className="costing-num">{money(c.AV)}</td></tr>
           </tbody>
         </table>
       </section>
@@ -169,8 +169,8 @@ export default function CostingScreen() {
                     <th scope="col" aria-label="Раскрыть" />
                     <th scope="col">Заказ</th><th scope="col">Поставщик</th><th scope="col">Позиция</th>
                     <th scope="col" className="costing-num">Кол-во</th><th scope="col" className="costing-num">Цена</th>
-                    <th scope="col" className="costing-num">Y, ₽</th><th scope="col" className="costing-num">AB</th><th scope="col" className="costing-num costing-coef" title={adTip('прогноз цены в РФ = цена в ₽ × этот коэффициент')}>{AD_SHORT}</th>
-                    <th scope="col" className="costing-num">Себестоимость, ₽</th><th scope="col" className="costing-num">AV, ₽/шт</th>
+                    <th scope="col" className="costing-num" title="Цена в рублях за единицу по курсу даты расчёта (Y)">Цена ₽/шт</th><th scope="col" className="costing-num" title="Прогноз цены в РФ за единицу = цена в ₽ × расчётный коэффициент (AB)">Прогноз ₽/шт</th><th scope="col" className="costing-num costing-coef" title={adTip('прогноз цены в РФ = цена в ₽ × этот коэффициент')}>{AD_SHORT}</th>
+                    <th scope="col" className="costing-num">Себестоимость, ₽</th><th scope="col" className="costing-num" title="Себестоимость за единицу (AV)">Себест. ₽/шт</th>
                     <th scope="col" className="costing-num costing-coef" title={awTip('себестоимость за единицу / цена в ₽ за единицу')}>{AW_SHORT}</th><th scope="col" className="costing-num">Отклонение</th>
                   </tr>
                 </thead>

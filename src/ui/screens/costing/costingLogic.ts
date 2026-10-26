@@ -146,8 +146,8 @@ const r2 = (n: number | null | undefined): number | null => (n === null || n ===
 export function buildReportRows(ds: Dataset, rows: CostingRow[], selected: ReadonlySet<string>, today: ISODate): ReportRow[] {
   const numbers = ds.orders.filter((o) => selected.has(o.id)).map((o) => o.number).sort((a, b) => a - b).join(', ');
   const header = [
-    'Заказ', 'Поставщик', '№', 'Позиция', 'Кол-во', 'Цена в валюте', 'Валюта', 'Y, ₽', 'AB', AD_LABEL,
-    'Себестоимость позиции, ₽', 'AV, ₽/шт', AW_LABEL, 'Отклонение, %', 'Статус',
+    'Заказ', 'Поставщик', '№', 'Позиция', 'Кол-во', 'Цена в валюте', 'Валюта', 'Цена ₽/шт', 'Прогноз ₽/шт', AD_LABEL,
+    'Себестоимость позиции, ₽', 'Себестоимость за единицу, ₽', AW_LABEL, 'Отклонение, %', 'Статус',
     ...COST_CATEGORIES.map((k) => `${COST_CATEGORY_LABEL[k]}, ₽`),
   ];
   const out: ReportRow[] = [

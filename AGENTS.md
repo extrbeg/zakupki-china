@@ -5,7 +5,7 @@
 
 - `npm ci` — установка (Node 20).
 - `npm run dev -- --port 4198 --strictPort` — dev-сервер.
-- `npm run check` — `tsc --noEmit` + все тесты; чистый клон: 435 passed, 1 skipped (`tests/import/reference.test.ts` без `fixtures/private/legacy.json`; с ним — 436).
+- `npm run check` — `tsc --noEmit` + все тесты; на чистом клоне один тест пропускается — `tests/import/reference.test.ts` без `fixtures/private/legacy.json`.
 - `npx vitest run tests/domain/rates.test.ts` — один тестовый файл (собираются `tests/**` и `apps-script/test/**`).
 - `npm run build` — типы + сборка в `dist/` с PWA manifest и sw.
 - `npm run preview -- --port 4199 --strictPort` — раздача `dist/`.

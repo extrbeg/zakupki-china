@@ -65,7 +65,7 @@ describe('блок поставщика: заголовок и таблица т
     const heads = within(table).getAllByRole('columnheader').map((th) => (th.textContent ?? '').replace(/\s+/g, ' ').trim());
     expect(heads.slice(0, 15)).toEqual([
       'В работу', '№', 'Товар', 'Кол-во', 'Цена, CNY', 'Сумма, CNY', 'Цена ₽/шт', 'Сумма ₽', 'Расч. коэфф.',
-      'Прогноз ₽/шт (AB)', 'Прогноз ₽ на кол-во', 'Себест. ₽/шт (AV)', 'Себест. ₽ на кол-во', 'Факт. коэфф.', 'Откл.',
+      'Прогноз ₽/шт', 'Прогноз ₽ на кол-во', 'Себест. ₽/шт', 'Себест. ₽ на кол-во', 'Факт. коэфф.', 'Откл.',
     ]);
   });
 
@@ -411,7 +411,7 @@ describe('таблица товаров на ноутбуке (≈1024 px)', () 
     renderAt('/orders/o12', adSeed());
     const table = await screen.findByRole('table', { name: 'Товары 12-1' });
     const head = (title: string) => within(table).getAllByRole('columnheader').find((th) => (th.textContent ?? '').trim() === title) as HTMLElement;
-    for (const title of ['Цена ₽/шт', 'Прогноз ₽/шт (AB)', 'Себест. ₽/шт (AV)']) expect(head(title).classList.contains('lines-col--minor')).toBe(false);
+    for (const title of ['Цена ₽/шт', 'Прогноз ₽/шт', 'Себест. ₽/шт']) expect(head(title).classList.contains('lines-col--minor')).toBe(false);
     for (const title of ['Сумма ₽', 'Прогноз ₽ на кол-во', 'Себест. ₽ на кол-во']) expect(head(title).classList.contains('lines-col--minor')).toBe(true);
     const r1 = screen.getByTestId('line-ln1');
     for (const col of ['Y', 'AB', 'AV']) expect(r1.querySelector(`[data-col="${col}"]`)?.closest('td')?.classList.contains('lines-col--minor')).toBe(false);

@@ -12,6 +12,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.7.1',
+    date: '2026-10-26',
+    added: ['Новый значок приложения — коробка (на телефоне, в браузере и на экране входа).'],
+    fixed: ['На экране «Себестоимость» и в листе «Себестоимость» вместо букв Y, AB, AV — понятные названия колонок.'],
+  },
+  {
     version: '0.7.0',
     date: '2026-10-26',
     added: [

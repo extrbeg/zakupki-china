@@ -8,7 +8,7 @@ export function EntryScreen() {
   return (
     <main className="entry">
       <div className="entry__card">
-        <img className="entry__logo" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={56} height={56} />
+        <img className="entry__logo" src={`${import.meta.env.BASE_URL}logo.png`} alt="" width={56} height={56} />
         <h1 className="entry__title">Закупки Китай</h1>
         <p className="muted">Учёт закупок, курсы и себестоимость позиций. Данные хранятся в вашей Google-таблице.</p>
         {googleConfigured ? (

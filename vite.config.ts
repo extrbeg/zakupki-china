@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
         // prompt: новая версия не подменяет открытую молча — приложение показывает «Доступна новая версия — Обновить».
         registerType: 'prompt',
         injectRegister: false,
-        includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+        includeAssets: ['favicon.ico', 'favicon-32.png', 'favicon-48.png', 'apple-touch-icon.png', 'logo.png'],
         manifest: {
           name: 'Закупки Китай',
           short_name: 'Закупки',

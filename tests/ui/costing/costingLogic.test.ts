@@ -131,7 +131,7 @@ describe('buildReportRows — лист «Себестоимость»', () => {
     const cols = rows[head] as string[];
     const line = rows.slice(head + 1).find((r) => r[cols.indexOf('Позиция')] === 'Кран')!;
     expect(line[cols.indexOf('Себестоимость позиции, ₽')]).toBe(12500);
-    expect(line[cols.indexOf('AV, ₽/шт')]).toBe(125);
+    expect(line[cols.indexOf('Себестоимость за единицу, ₽')]).toBe(125);
     expect(line[cols.indexOf('Фактический коэффициент себестоимости доставки')]).toBe(2.5);
     expect(line[cols.indexOf('Расчётный коэффициент себестоимости доставки')]).toBe(1.5);
     expect(cols).not.toContain('AD');

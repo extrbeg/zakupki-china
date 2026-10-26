@@ -100,7 +100,7 @@ export function LineForm({ order, so, line, nextSeq, rate, onClose }: {
     if (typeof live.qty !== 'number' || typeof live.unitPrice !== 'number') return null;
     const f = lineFigures({ qty: live.qty, unitPrice: live.unitPrice, coef: live.coef } as Line, rate, so);
     if (f.Y === null) return 'Нет курса на дату расчёта — прогноз не посчитан';
-    return `Y = ${formatMoney(f.Y)} ₽${f.AB === null ? '' : `, AB = ${formatMoney(f.AB)} ₽ за единицу`}`;
+    return `Цена ${formatMoney(f.Y)} ₽/шт${f.AB === null ? '' : `, прогноз ${formatMoney(f.AB)} ₽ за единицу`}`;
   })();
 
   const save = async () => {

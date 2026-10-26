@@ -1,0 +1,9 @@
+/* Стили экранов справочников (поставщики, агенты, перевозчики, списки). */
+.dir-group { margin-bottom: 20px; }
+.dir-group__province { font-size: 1.15rem; margin: 18px 0 8px; padding-bottom: 4px; border-bottom: 2px solid var(--c-border); }
+.dir-group__city { font-size: 0.98rem; margin: 12px 0 6px; color: var(--c-muted); }
+.list-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+.list-row__input { flex: 1 1 200px; min-width: 0; }
+.list-row__error { flex: 1 1 100%; }
+.list-add { display: flex; align-items: flex-end; gap: 8px; margin-top: 10px; }
+.list-add .field { flex: 1 1 auto; }

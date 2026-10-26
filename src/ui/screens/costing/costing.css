@@ -1,0 +1,33 @@
+/* Стили экрана «Себестоимость». */
+.costing-picker { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius); padding: 12px 16px; margin-bottom: var(--gap); }
+.costing-picker__head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--gap); }
+.costing-picker__head .field { flex: 1 1 220px; max-width: 360px; }
+.costing-picker__list { list-style: none; margin: 10px 0 0; padding: 0; max-height: 220px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px 16px; }
+.costing-picker__list .checkbox { min-height: 32px; }
+.costing-picker__count { margin: 8px 0 0; }
+.costing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: var(--gap) 0; }
+.costing-status { margin: 0 0 var(--gap); padding: 8px 12px; border-radius: var(--radius); background: var(--c-demo-bg); color: var(--c-primary); }
+.costing-totals { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px 16px; margin: 0 0 var(--gap); }
+.costing-totals div { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius); padding: 8px 12px; }
+.costing-totals dt { font-size: 0.85rem; color: var(--c-muted); }
+.costing-totals dd { margin: 0; font-size: 1.05rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.costing-warnings { margin: 0 0 var(--gap); padding: 8px 16px 8px 32px; background: var(--c-warn-bg); border-radius: var(--radius); }
+.costing-warnings li { margin: 3px 0; }
+.costing-warnings a { margin-left: 8px; }
+.costing-table td, .costing-table th { white-space: nowrap; }
+.costing-num { text-align: right; }
+.costing-toggle { min-width: 30px; }
+.costing-provisional { color: var(--c-muted); }
+.costing-note { display: block; font-size: 0.78rem; color: var(--c-muted); }
+.costing-dev { font-weight: 600; }
+.costing-dev--good { color: #1b7a3a; }
+.costing-dev--bad { color: var(--c-error); }
+.costing-detail td { background: var(--c-bg); white-space: normal; }
+.costing-detail__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.costing-detail h3 { font-size: 0.95rem; color: var(--c-muted); margin: 0 0 6px; }
+.costing-detail table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.costing-detail th, .costing-detail td { padding: 4px 8px; border-bottom: 1px solid var(--c-border); text-align: left; }
+.costing-detail td.costing-num, .costing-detail th.costing-num { text-align: right; }
+@media (max-width: 600px) {
+  .costing-picker__list { grid-template-columns: 1fr; }
+}

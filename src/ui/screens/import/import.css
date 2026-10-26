@@ -1,0 +1,13 @@
+/* Экран «Импорт из старой таблицы». */
+.import__intro { max-width: 760px; margin: 0 0 var(--gap); }
+.import .ui-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: var(--gap) 0; }
+.import__h2 { font-size: 1.15rem; margin: 20px 0 8px; }
+.import__h3 { font-size: 1rem; margin: 16px 0 6px; }
+.import .num { text-align: right; }
+.import-stats { max-width: 420px; }
+.import-problems { max-height: 420px; overflow: auto; }
+.import-problems__msg { white-space: normal; min-width: 260px; }
+.import__warning { border-radius: var(--radius); margin: var(--gap) 0; align-items: flex-start; }
+.import__warning p { margin: 4px 0; }
+.import__done { margin-top: var(--gap); }
+.import__actions .sheet-link { flex: 1 1 24rem; margin: 0; }

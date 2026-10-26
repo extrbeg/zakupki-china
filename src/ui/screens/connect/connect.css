@@ -1,0 +1,4 @@
+/* Поле «Ссылка на таблицу»: поле и кнопка в строку, на узком экране кнопка переносится. */
+.sheet-link { margin: 12px 0; max-width: 40rem; }
+.sheet-link__row { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.sheet-link__input { flex: 1 1 16rem; min-width: 0; }

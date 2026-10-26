@@ -1,0 +1,59 @@
+# Сборка приложения и публикация на GitHub Pages при каждом push в main.
+# Идентификаторы Google Cloud берутся из переменных репозитория
+# (Settings → Secrets and variables → Actions → Variables): VITE_GOOGLE_CLIENT_ID, VITE_GOOGLE_API_KEY, VITE_GOOGLE_APP_ID.
+# Это публичные идентификаторы, ограниченные доменом, поэтому они хранятся как переменные, а не как секреты.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Одновременно идёт только одна публикация; новая заменяет ожидающую, но не прерывает идущую.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Проверка (типы и тесты)
+        run: npm run check
+
+      - name: Сборка
+        run: npm run build
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_API_KEY: ${{ vars.VITE_GOOGLE_API_KEY }}
+          VITE_GOOGLE_APP_ID: ${{ vars.VITE_GOOGLE_APP_ID }}
+          # Страница живёт по адресу https://<логин>.github.io/<имя-репозитория>/
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

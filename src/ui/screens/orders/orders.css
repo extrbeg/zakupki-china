@@ -1,0 +1,127 @@
+/* Стили экранов заказов. */
+.order-link { display: inline-block; margin-top: 4px; font-size: 0.87rem; }
+/* Блок поставщика — общая карточка .ui-card с цветной полосой слева. */
+.so-block { border-left: 4px solid var(--c-primary); padding: 14px 12px; }
+.so-block__head { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; margin-bottom: 10px; }
+.so-block__head h2 { margin: 0; font-size: 1.15rem; }
+.so-block__head .order-link { margin-top: 0; }
+.so-block__meta { color: var(--c-muted); font-size: 0.93rem; }
+.so-block__warn { color: #8a5a00; }
+.so-block__summary { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; margin-bottom: 12px; }
+.so-block__ad { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: flex-start; }
+.so-block__ad .field { width: 120px; }
+.so-block__ad > .btn, .so-block__ad > .small { margin-top: 28px; }
+.so-block__ad .field__hint, .so-block__ad .field__error { white-space: nowrap; }
+.so-totals { display: flex; flex-wrap: wrap; gap: 8px 10px; margin: 0; flex: 1 1 420px; }
+.so-totals > div { background: var(--c-bg); border-radius: var(--radius); padding: 6px 12px; min-width: 130px; flex: 1 1 130px; }
+.so-totals dt { font-size: 0.8rem; color: var(--c-muted); }
+.so-totals dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.so-form { background: var(--c-bg); border: 1px solid var(--c-border); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
+.readonly-value { min-height: 36px; display: flex; align-items: center; font-variant-numeric: tabular-nums; }
+.totals { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px 16px; margin: 0; }
+.totals__item { background: var(--c-bg); border-radius: var(--radius); padding: 8px 12px; }
+.totals dt { font-size: 0.85rem; color: var(--c-muted); }
+.totals dd { margin: 0; font-size: 1.05rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Таблица товаров: компактная, на 1280 px помещается целиком; на узком экране прокручивается внутри блока. */
+.table.lines-table { font-size: 0.8rem; }
+.table.lines-table th, .table.lines-table td { padding: 4px 5px; }
+.table.lines-table th { white-space: normal; vertical-align: bottom; line-height: 1.15; font-size: 0.72rem; hyphens: manual; }
+.table.lines-table th.num, .table.lines-table td.num { text-align: right; }
+.table.lines-table td.cell--name { white-space: normal; min-width: 8rem; overflow-wrap: anywhere; }
+.table.lines-table td.cell--actions, .table.lines-table th.cell--actions { width: 1%; padding-left: 2px; padding-right: 2px; }
+.table.lines-table tbody tr:hover { background: #fafbfc; }
+.lines-table .btn--small { min-height: 24px; padding: 1px 6px; font-size: 0.75rem; }
+.table.lines-table tfoot td { border-top: 2px solid var(--c-border); border-bottom: 0; background: #fbfcfd; }
+.so-lines__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.input--cell { min-height: 28px; padding: 2px 5px; font-size: 0.8rem; min-width: 3.5rem; }
+.entry-row td { vertical-align: top; }
+.entry-row .field__error { font-size: 0.75rem; white-space: normal; max-width: 12rem; }
+.is-alt-row > td { opacity: 0.55; }
+.is-alt-row > td.cell--actions { opacity: 1; }
+/* Флажок «В работу» первой колонкой: крупная зона клика, у строк «не в работе» не бледнеет. */
+.table.lines-table th.cell--pick, .table.lines-table td.cell--pick { width: 1%; padding-left: 2px; padding-right: 2px; text-align: center; }
+.is-alt-row > td.cell--pick { opacity: 1; }
+.pick-box { display: flex; align-items: center; justify-content: center; min-width: 30px; min-height: 30px; cursor: pointer; border-radius: 4px; }
+.pick-box:hover { background: var(--c-demo-bg); }
+.pick-box input { width: 18px; height: 18px; margin: 0; cursor: pointer; }
+.is-provisional { color: var(--c-muted); }
+.ad-own { font-weight: 700; color: var(--c-primary); background: var(--c-demo-bg); border-radius: 4px; padding: 0 4px; }
+.ad-reset { margin-left: 3px; color: var(--c-muted); font-size: 0.95rem; line-height: 1; }
+.ad-reset:hover { color: var(--c-error); text-decoration: none; }
+.badge { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 10px; background: var(--c-bg); border: 1px solid var(--c-border); font-size: 0.75rem; color: var(--c-muted); }
+.small-note { display: block; font-size: 0.68rem; color: var(--c-muted); }
+.dev { font-weight: 600; }
+.dev--better { color: #1b7a3a; }
+.dev--worse { color: var(--c-error); }
+.line-detail > td { white-space: normal; background: var(--c-bg); padding: 0; }
+.line-detail__inner { position: sticky; left: 0; max-width: min(100%, calc(100vw - 62px)); }
+.line-form { background: var(--c-bg); border: 1px solid var(--c-border); border-radius: var(--radius); padding: 12px; margin-top: 12px; }
+.line-detail .line-form { margin: 0; border: 0; border-radius: 0; font-size: 0.93rem; }
+.line-form__preview { margin: 8px 0 0; color: var(--c-muted); font-size: 0.9rem; }
+.coef-hint { margin-top: 4px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 4px; }
+.so-lines__actions { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 10px; }
+.paste-panel { margin-top: 12px; padding: 12px; background: var(--c-bg); border: 1px solid var(--c-border); border-radius: var(--radius); }
+.paste-panel__title { font-size: 1rem; margin: 0 0 8px; }
+.paste-panel textarea.input { min-height: 7rem; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+.paste-panel__preview { margin-top: 10px; max-height: 22rem; overflow-y: auto; }
+.paste-panel__preview .table { font-size: 0.84rem; }
+.paste-row--bad td { color: var(--c-error); }
+.paste-row--skip td { color: var(--c-muted); }
+.paste-row__status { white-space: normal; }
+.feed-title { font-size: 0.95rem; margin: 12px 0 6px; color: var(--c-muted); }
+
+/* Ноутбук (≈1024–1279 px, меню слева): суммы «на кол-во» (сумма ₽, прогноз и себестоимость на кол-во) скрыты — таблица
+   помещается без прокрутки вбок; значения за единицу (₽/шт, прогноз ₽/шт, себест. ₽/шт), AD, AW и отклонение остаются.
+   Телефон и ≥1280 px — как было. */
+@media (min-width: 769px) and (max-width: 1279.98px) {
+  .table.lines-table .lines-col--minor { display: none; }
+  .table.lines-table { font-size: 0.76rem; }
+  .table.lines-table th, .table.lines-table td { padding: 4px 3px; }
+  .table.lines-table td.cell--name { min-width: 6rem; }
+  .table.lines-table .input--cell { min-width: 3rem; padding: 2px 3px; }
+  .lines-table .btn--small { padding: 1px 4px; font-size: 0.7rem; }
+}
+
+/* Вкладки карточки заказа. */
+.order-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 12px; border-bottom: 2px solid var(--c-border); }
+.order-tabs__tab { border: 0; background: none; padding: 9px 14px; font: inherit; color: var(--c-muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: var(--radius) var(--radius) 0 0; }
+.order-tabs__tab:hover { color: var(--c-text); background: var(--c-surface); }
+.order-tabs__tab--active { color: var(--c-primary); font-weight: 600; border-bottom-color: var(--c-primary); background: var(--c-surface); }
+
+/* «Сравнение цен»: товары × поставщики; на узком экране прокрутка внутри блока, колонка товаров закреплена. */
+.cmp__hint { margin: -4px 0 10px; }
+.cmp__scroll { max-height: 75vh; overflow: auto; }
+.table.cmp-table { width: auto; min-width: 100%; font-size: 0.85rem; }
+.table.cmp-table th, .table.cmp-table td { padding: 6px 8px; }
+.cmp-table__product { position: sticky; left: 0; z-index: 2; background: var(--c-surface); min-width: 8rem; max-width: 14rem; white-space: normal !important; overflow-wrap: anywhere; color: var(--c-text); box-shadow: 1px 0 0 var(--c-border); }
+.table.cmp-table thead th { z-index: 3; }
+.table.cmp-table thead th.cmp-table__product { z-index: 4; background: #fafbfc; }
+.cmp-table__supplier { min-width: 11.5rem; }
+.cmp-head__code { display: block; font-size: 1rem; color: var(--c-text); }
+.cmp-head__name { display: block; font-weight: 400; white-space: normal; }
+.cmp-head__meta { display: block; font-weight: 400; font-size: 0.78rem; }
+.cmp-head__actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.cmp-head__actions .btn--small { min-height: 26px; padding: 1px 7px; font-size: 0.75rem; font-weight: 400; }
+.cmp-cell { min-width: 11.5rem; }
+.cmp-cell--offer { cursor: pointer; }
+.cmp-cell--offer:hover { background: #f6f9fc; }
+.cmp-cell--on { background: #e8f4ec; }
+.cmp-cell--on:hover { background: #dcefe2; }
+.cmp-offer { display: grid; gap: 1px; cursor: pointer; padding: 2px 0; }
+.cmp-offer + .cmp-offer { border-top: 1px dashed var(--c-border); margin-top: 4px; padding-top: 6px; }
+.cmp-offer__check { display: flex; align-items: center; gap: 6px; }
+.cmp-offer__check input { width: 18px; height: 18px; margin: 0; }
+.cmp-offer__main { font-weight: 600; }
+.cmp-offer__rub { color: var(--c-muted); }
+.cmp-offer__ab { color: var(--c-muted); }
+.cmp-offer__ab [data-col="AB"] { color: var(--c-text); font-weight: 600; }
+.cmp-offer--best .cmp-offer__ab [data-col="AB"] { color: #1b7a3a; }
+.cmp-best { font-size: 0.7rem; font-weight: 600; color: #1b7a3a; background: #e3f3e8; border: 1px solid #a9d8b8; border-radius: 10px; padding: 0 6px; }
+.cmp-cell--best { box-shadow: inset 3px 0 0 #1b7a3a; }
+.table.cmp-table tfoot th, .table.cmp-table tfoot td { border-top: 2px solid var(--c-border); background: #fbfcfd; }
+.table.cmp-table tfoot tr + tr th, .table.cmp-table tfoot tr + tr td { border-top: 0; }
+.table.cmp-table tfoot .cmp-table__product { background: #fbfcfd; }
+.cmp-total > span { display: block; }
+.cmp-total__sum { font-weight: 600; }
+.cmp-order { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; margin-top: 12px; padding: 8px 12px; background: var(--c-bg); border-radius: var(--radius); font-variant-numeric: tabular-nums; }

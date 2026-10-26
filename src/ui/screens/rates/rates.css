@@ -1,0 +1,14 @@
+/* Экраны «Курсы» и «Затраты»: таблица курсов, карточки форм, подписи курса. */
+.rates-table th[scope="row"] { text-align: left; font-weight: 500; white-space: nowrap; }
+.rate-cell { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.rate-cell__value { font-variant-numeric: tabular-nums; }
+.rate-cell__src { font-size: 0.78rem; color: var(--c-muted); }
+.rate-cell__src--manual { color: var(--c-primary); font-weight: 600; }
+.rate-cell__replaced { font-size: 0.78rem; color: var(--c-muted); text-decoration: line-through; }
+.rate-note { font-size: 0.85rem; color: var(--c-muted); }
+.rate-note--warn { color: var(--c-error); }
+.tag { display: inline-block; font-size: 0.78rem; padding: 0 6px; border-radius: 10px; border: 1px solid var(--c-border); color: var(--c-muted); white-space: nowrap; }
+.tag--plan { border-color: #c9a227; color: #7a5d00; }
+.tag--fact { border-color: var(--c-primary); color: var(--c-primary); }
+.ui-card .rate-note { margin: 4px 0; }
+.ui-card .btn--small + .btn--small { margin-left: 6px; }

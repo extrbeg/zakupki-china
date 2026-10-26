@@ -1,0 +1,155 @@
+/* Свой небольшой CSS без UI-кита. Мобильная вёрстка от 360 px. */
+:root {
+  --c-bg: #f5f7fa;
+  --c-surface: #ffffff;
+  --c-text: #1d2530;
+  --c-muted: #5f6b7a;
+  --c-border: #d6dce4;
+  --c-primary: #1f4e79;
+  --c-primary-text: #ffffff;
+  --c-error: #b3261e;
+  --c-error-bg: #fdecea;
+  --c-warn-bg: #fff4d6;
+  --c-demo-bg: #e7f0fa;
+  --radius: 6px;
+  --gap: 12px;
+  --nav-w: 210px;
+  color-scheme: light;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--c-text);
+  background: var(--c-bg);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--c-bg); }
+body { min-width: 320px; overflow-x: hidden; }
+a { color: var(--c-primary); }
+h1, h2, h3 { line-height: 1.25; margin: 0 0 var(--gap); }
+.muted { color: var(--c-muted); }
+.small { font-size: 0.87rem; }
+
+/* ---------- оболочка ---------- */
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+.app__header {
+  display: flex; align-items: center; gap: var(--gap);
+  padding: 10px 16px; background: var(--c-primary); color: var(--c-primary-text);
+  position: sticky; top: 0; z-index: 20;
+}
+.app__title { font-weight: 600; font-size: 1.05rem; }
+.app__user { margin-left: auto; color: rgba(255, 255, 255, 0.85); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app__burger {
+  display: none; background: none; border: 0; color: inherit; font-size: 1.4rem; line-height: 1;
+  padding: 4px 6px; cursor: pointer; border-radius: var(--radius);
+}
+.app__body { flex: 1; display: flex; min-width: 0; }
+.app__nav {
+  width: var(--nav-w); flex: 0 0 var(--nav-w); background: var(--c-surface);
+  border-right: 1px solid var(--c-border); padding: 8px 0; display: flex; flex-direction: column;
+}
+.app__nav-link { padding: 9px 16px; color: var(--c-text); text-decoration: none; }
+.app__nav-link:hover { background: var(--c-bg); }
+.app__nav-link--active { color: var(--c-primary); font-weight: 600; background: var(--c-demo-bg); }
+.app__main { flex: 1; min-width: 0; padding: 16px; }
+
+.screen { max-width: 1200px; }
+.screen__title { font-size: 1.4rem; }
+
+/* ---------- плашки ---------- */
+.banner {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 8px 16px; font-size: 0.93rem;
+}
+.banner--demo { background: var(--c-demo-bg); color: var(--c-primary); justify-content: space-between; }
+.banner--warning { background: var(--c-warn-bg); }
+.banner--error { background: var(--c-error-bg); color: var(--c-error); border-radius: var(--radius); margin-bottom: var(--gap); }
+
+/* ---------- кнопки ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 38px; padding: 6px 14px; border: 1px solid var(--c-border); border-radius: var(--radius);
+  background: var(--c-surface); color: var(--c-text); font: inherit; cursor: pointer; text-decoration: none;
+}
+.btn:hover { border-color: var(--c-primary); }
+.btn--primary { background: var(--c-primary); border-color: var(--c-primary); color: var(--c-primary-text); }
+.btn--small { min-height: 30px; padding: 3px 10px; font-size: 0.9rem; }
+.btn:disabled { opacity: 0.55; cursor: default; }
+.btn--danger { color: var(--c-error); border-color: var(--c-error); }
+.btn--link { border: none; background: none; padding: 0; min-height: 0; color: inherit; text-align: inherit; cursor: pointer; font: inherit; }
+.btn--link:hover { text-decoration: underline; }
+.confirm-delete { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* ---------- карточки и тулбары (общие для всех экранов) ---------- */
+.ui-card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+.ui-card--warning { background: var(--c-warn-bg); }
+.ui-card__title { font-size: 1.1rem; margin: 0 0 var(--gap); }
+.ui-card__section { font-size: 0.95rem; margin: 18px 0 8px; color: var(--c-muted); }
+.ui-card__actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 16px; }
+.ui-card__spacer { flex: 1 1 auto; }
+.ui-card__full { grid-column: 1 / -1; }
+.ui-card__wide { grid-column: span 2; }
+.ui-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--gap); margin-bottom: var(--gap); }
+.ui-toolbar .field { flex: 1 1 180px; max-width: 320px; }
+.ui-toolbar__spacer { flex: 1 1 auto; }
+.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------- формы ---------- */
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--gap) 16px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field__label { font-size: 0.87rem; color: var(--c-muted); }
+.field__required { color: var(--c-error); }
+.field__error { font-size: 0.85rem; color: var(--c-error); }
+.field__hint { font-size: 0.85rem; color: var(--c-muted); }
+.input {
+  width: 100%; min-height: 38px; padding: 6px 10px; font: inherit; color: var(--c-text);
+  background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius);
+}
+.input:focus { outline: 2px solid rgba(31, 78, 121, 0.35); border-color: var(--c-primary); }
+.field--invalid .input { border-color: var(--c-error); }
+.input--number { text-align: right; font-variant-numeric: tabular-nums; }
+textarea.input { resize: vertical; }
+.field--checkbox { justify-content: flex-end; }
+.checkbox { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; cursor: pointer; }
+.checkbox input { width: 18px; height: 18px; }
+
+/* ---------- таблица ---------- */
+.table-scroll {
+  width: 100%; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius);
+}
+.table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.table th, .table td { padding: 7px 10px; border-bottom: 1px solid var(--c-border); white-space: nowrap; vertical-align: top; }
+.table th { text-align: left; font-weight: 600; font-size: 0.87rem; color: var(--c-muted); background: #fafbfc; position: sticky; top: 0; }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table__row--clickable { cursor: pointer; }
+.table__row--clickable:hover { background: var(--c-bg); }
+.table-empty { padding: 16px; color: var(--c-muted); background: var(--c-surface); border: 1px dashed var(--c-border); border-radius: var(--radius); }
+
+/* ---------- пустое состояние ---------- */
+.empty-state { text-align: center; padding: 32px 16px; background: var(--c-surface); border: 1px dashed var(--c-border); border-radius: var(--radius); }
+.empty-state__title { font-size: 1.15rem; }
+.empty-state__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: var(--gap); }
+
+/* ---------- вход ---------- */
+.entry { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.entry__card { width: 100%; max-width: 440px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 10px; padding: 24px; text-align: center; }
+.entry__logo { display: block; margin: 0 auto 12px; }
+.entry__title { font-size: 1.5rem; }
+.entry__google { margin: 16px 0; text-align: left; }
+.entry__google .screen__title { font-size: 1.1rem; }
+.entry__demo { margin-top: 16px; }
+
+/* ---------- узкие экраны ---------- */
+@media (max-width: 768px) {
+  .app__burger { display: inline-block; }
+  .app__nav {
+    position: fixed; top: 48px; left: 0; bottom: 0; z-index: 15; width: min(80vw, 280px);
+    transform: translateX(-100%); transition: transform 0.18s ease; box-shadow: 2px 0 12px rgba(0, 0, 0, 0.12);
+  }
+  .app__nav--open { transform: translateX(0); }
+  .app__main { padding: 12px; }
+}
+@media (max-width: 600px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .ui-card__wide { grid-column: 1 / -1; }
+}

@@ -1,0 +1,16 @@
+/* Стили экранов поставок. */
+.ship-warnings { margin: 0; padding-left: 20px; }
+.ship-warnings li { margin-bottom: 8px; }
+.ship-warnings__links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.ship-muted { color: var(--c-muted); }
+.ship-select { min-width: 140px; }
+.ship-row--highlight td { background: var(--c-warn-bg); }
+.ship-batch-form { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--c-border); }
+.ship-batch-form__title { font-size: 1rem; margin: 0 0 8px; }
+.ship-decl { border: 1px solid var(--c-border); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
+.ship-decl__facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px 16px; margin: 12px 0; }
+.ship-decl__facts dt { font-size: 0.85rem; color: var(--c-muted); }
+.ship-decl__facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+.ship-decl__note { font-size: 0.85rem; color: var(--c-muted); }
+.ship-new-decl { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 16px; margin-top: 8px; }
+.ship-new-decl .field { flex: 1 1 180px; max-width: 260px; }

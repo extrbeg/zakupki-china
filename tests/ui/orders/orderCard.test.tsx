@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { Dataset } from '../../../src/domain/model';
 import { baseSeed, closedHistory, merge, renderAt } from './helpers';
+import { pickSuggestion } from '../components/suggest';
 
 const flat = (s: string | null | undefined) => (s ?? '').replace(/[\s  ]/g, '');
 const header = () => screen.getByRole('region', { name: 'Шапка заказа' });
@@ -93,7 +94,7 @@ describe('поставщики в заказе', () => {
     const { store } = renderAt('/orders/o12', baseSeed);
     fireEvent.click(await screen.findByRole('button', { name: 'Добавить поставщика в заказ' }));
     const b = screen.getByRole('region', { name: 'Новый поставщик в заказе' });
-    set(within(b).getByLabelText(/^Поставщик/), 's2');
+    pickSuggestion(within(b).getByLabelText(/^Поставщик/), 'Beta Cable');
     set(within(b).getByLabelText(/^Валюта/), 'USD');
     set(within(b).getByLabelText(/^Условия оплаты/), '30/70');
     set(within(b).getByLabelText(/^План\. тип доставки/), 'air');
@@ -144,7 +145,7 @@ describe('позиции', () => {
     expect(cell(row, 'Y')).toBe('50,00');
     expect(cell(row, 'Z')).toBe('50000,00');
     expect(cell(row, 'AB')).toBe('75,00');
-    expect(cell(row, 'AD')).toBe('1,5');
+    expect((row.querySelector('[data-col="AD"] input') as HTMLInputElement).value).toBe('1,5');
     const alt = screen.getByText('Кран DN25 альт.');
     expect(alt.closest('.is-alt')).not.toBeNull();
     expect(within(alt.closest('tr') as HTMLElement).getByText('не в работе')).toBeTruthy();
@@ -189,7 +190,7 @@ describe('позиции', () => {
     f(/^CBM/, '0,5');
     f(/^Вес/, '12');
     f(/^Мест/, '3');
-    f(/^Коэффициент AD/, '1,6');
+    f(/^Расчётный коэффициент себестоимости доставки/, '1,6');
     f(/^Комментарий/, 'ок');
     const inWork = within(form).getByLabelText('В работу') as HTMLInputElement;
     expect(inWork.checked).toBe(false);                        // новая позиция — запрос цены, не в работе
@@ -238,7 +239,7 @@ describe('подсказка AD', () => {
     const { store } = renderAt('/orders/o12', withHistory([1.4, 1.6, 1.5]));
     fireEvent.click(await screen.findByRole('button', { name: 'Подробнее о позиции 1' }));
     const form = screen.getByRole('form', { name: 'Позиция' });
-    const ad = within(form).getByLabelText(/^Коэффициент AD/) as HTMLInputElement;
+    const ad = within(form).getByLabelText(/^Расчётный коэффициент себестоимости доставки/) as HTMLInputElement;
     set(ad, '2');
     fireEvent.click(within(form).getByRole('button', { name: /подсказка 1,50 \(по 3 закрытым позициям\)/ }));
     expect(ad.value).toBe('1,5');

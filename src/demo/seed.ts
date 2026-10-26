@@ -1,6 +1,13 @@
 // Синтетический набор для демо-режима. Все названия, люди и числа выдуманы и помечены «Демо».
 
 import type { Dataset, ListItem, ListKey, Rate } from '../domain/model';
+import { applyGeoSeed, GEO_VERSION, planGeoSeed, type GeoData } from '../data/geo';
+
+/** Справочник Китая для пустого набора. */
+function chinaGeo(): GeoData {
+  const empty: GeoData = { countries: [], provinces: [], cities: [] };
+  return applyGeoSeed(empty, planGeoSeed(empty));
+}
 
 const list = (key: ListKey, values: string[]): ListItem[] =>
   values.map((value, i) => ({ id: `demo_list_${key}_${i + 1}`, list: key, value, order: i + 1 }));
@@ -11,7 +18,7 @@ const rate = (date: string, currency: Rate['currency'], value: number): Rate =>
 export function demoSeed(): Partial<Dataset> {
   return {
     settings: { vatRateDefault: '22', bitrixPortalUrl: '', ratesSourceUrl: '' },
-    meta: { schemaVersion: '1' },
+    meta: { schemaVersion: '1', geoVersion: GEO_VERSION },
     lists: [
       ...list('payer', ['Демо-плательщик 1', 'Демо-плательщик 2']),
       ...list('department', ['Демо-цех', 'Демо-склад']),
@@ -25,22 +32,19 @@ export function demoSeed(): Partial<Dataset> {
       ...list('specialization', ['Краны', 'Кабель']),
       ...list('paymentTerms', ['30/70', '100 % предоплата']),
     ],
-    cities: [
-      { id: 'demo_city_1', city: 'Нинбо', province: 'Чжэцзян' },
-      { id: 'demo_city_2', city: 'Вэньчжоу', province: 'Чжэцзян' },
-      { id: 'demo_city_3', city: 'Гуанчжоу', province: 'Гуандун' },
-    ],
+    // G20/G21: справочник Китая — как в новой таблице (страна, 33 провинции, города с провинцией).
+    ...chinaGeo(),
     rates: [
       rate('2026-09-15', 'CNY', 11.62), rate('2026-09-15', 'USD', 83.1), rate('2026-09-15', 'EUR', 96.4),
       rate('2026-10-01', 'CNY', 11.48), rate('2026-10-01', 'USD', 82.2), rate('2026-10-01', 'EUR', 95.3),
       rate('2026-10-20', 'CNY', 11.55), rate('2026-10-20', 'USD', 82.7), rate('2026-10-20', 'EUR', 95.9),
     ],
     suppliers: [
-      { id: 'demo_sup_1', name: 'Демо Valve Factory', companyType: 'Фабрика', direction: 'Трубопроводная арматура', specialization: 'Краны', city: 'Вэньчжоу', province: 'Чжэцзян', contactPerson: 'Демо-контакт', comment: 'демо' },
-      { id: 'demo_sup_2', name: 'Демо Cable Trading', companyType: 'Торговая компания', direction: 'Электрика', specialization: 'Кабель', city: 'Гуанчжоу', province: 'Гуандун', comment: 'демо' },
-      { id: 'demo_sup_3', name: 'Демо Port Supply', companyType: 'Торговая компания', direction: 'Трубопроводная арматура', city: 'Нинбо', province: 'Чжэцзян', comment: 'демо' },
+      { id: 'demo_sup_1', name: 'Демо Valve Factory', companyType: 'Фабрика', direction: 'Трубопроводная арматура', specialization: 'Краны', country: 'Китай', city: 'Wenzhou', province: 'Zhejiang', contactPerson: 'Демо-контакт', comment: 'демо' },
+      { id: 'demo_sup_2', name: 'Демо Cable Trading', companyType: 'Торговая компания', direction: 'Электрика', specialization: 'Кабель', country: 'Китай', city: 'Guangzhou', province: 'Guangdong', comment: 'демо' },
+      { id: 'demo_sup_3', name: 'Демо Port Supply', companyType: 'Торговая компания', direction: 'Трубопроводная арматура', country: 'Китай', city: 'Ningbo', province: 'Zhejiang', comment: 'демо' },
     ],
-    agents: [{ id: 'demo_agent_1', name: 'Демо-агент по оплатам', city: 'Гуанчжоу', province: 'Гуандун', comment: 'демо' }],
+    agents: [{ id: 'demo_agent_1', name: 'Демо-агент по оплатам', country: 'Китай', city: 'Guangzhou', province: 'Guangdong', comment: 'демо' }],
     carriers: [{ id: 'demo_carrier_1', name: 'Демо-логистика', type: 'Экспедитор', specialization: 'Море, авто', contractSigned: true, comment: 'демо' }],
     orders: [
       { id: 'demo_ord_1', number: 1, date: '2026-09-10', department: 'Демо-цех', payer: 'Демо-плательщик 1', customer: 'Демо-заказчик Север', title: 'Краны для демо', calcDate: '2026-09-15', costsComplete: true },

@@ -60,13 +60,12 @@ describe('экран «Курсы»: история', () => {
 });
 
 describe('экран «Курсы»: ручной курс', () => {
-  it('«Добавить курс» сохраняет ручной курс (источник manual) и показывает его в таблице', async () => {
+  it('«Курсы на дату» сохраняет ручной курс (источник manual) и показывает его в таблице', async () => {
     const { store } = renderRates({ rates: seedRates });
     await screen.findByRole('rowheader', { name: '23.10.2026' });
-    fireEvent.click(screen.getByRole('button', { name: 'Добавить курс' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Курсы на дату' }));
     fireEvent.change(field(/^Дата/), { target: { value: '2026-10-24' } });
-    fireEvent.change(field(/^Валюта/), { target: { value: 'USD' } });
-    fireEvent.change(field(/^Курс/), { target: { value: '82,1' } });
+    fireEvent.change(field(/^USD/), { target: { value: '82,1' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(async () => expect((await store.load()).rates).toHaveLength(8));
     const added = (await store.load()).rates.find((r) => r.date === '2026-10-24');
@@ -79,10 +78,10 @@ describe('экран «Курсы»: ручной курс', () => {
   it('«82о» в курсе — «Введите число», прежнее «82» не сохраняется', async () => {
     const { store } = renderRates({ rates: seedRates });
     await screen.findByRole('rowheader', { name: '23.10.2026' });
-    fireEvent.click(screen.getByRole('button', { name: 'Добавить курс' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Курсы на дату' }));
     fireEvent.change(field(/^Дата/), { target: { value: '2026-10-24' } });
-    fireEvent.change(field(/^Курс/), { target: { value: '82' } });
-    fireEvent.change(field(/^Курс/), { target: { value: '82о' } });
+    fireEvent.change(field(/^USD/), { target: { value: '82' } });
+    fireEvent.change(field(/^USD/), { target: { value: '82о' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     expect(await screen.findByText('Введите число')).toBeTruthy();
     await new Promise((r) => setTimeout(r, 20));
@@ -92,8 +91,8 @@ describe('экран «Курсы»: ручной курс', () => {
   it('курс ≤ 0 или пустой — ошибка у поля, ничего не записано', async () => {
     const { store } = renderRates({ rates: seedRates });
     await screen.findByRole('rowheader', { name: '23.10.2026' });
-    fireEvent.click(screen.getByRole('button', { name: 'Добавить курс' }));
-    fireEvent.change(field(/^Курс/), { target: { value: '0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Курсы на дату' }));
+    fireEvent.change(field(/^USD/), { target: { value: '0' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     expect(await screen.findByText('Введите курс больше нуля')).toBeTruthy();
     expect((await store.load()).rates).toHaveLength(7);
@@ -109,16 +108,47 @@ describe('экран «Курсы»: ручной курс', () => {
     expect((await store.load()).rates).toHaveLength(7);
   });
 
-  it('добавление ручного курса на дату и валюту, где ручной уже есть, обновляет его', async () => {
-    const { store } = renderRates({ rates: seedRates });
-    await screen.findByRole('rowheader', { name: '23.10.2026' });
-    fireEvent.click(screen.getByRole('button', { name: 'Добавить курс' }));
-    fireEvent.change(field(/^Дата/), { target: { value: '2026-10-23' } });
-    fireEvent.change(field(/^Валюта/), { target: { value: 'CNY' } });
-    fireEvent.change(field(/^Курс/), { target: { value: '11,9' } });
+  it('правка переносит ручной курс на дату и валюту, где ручной уже есть, — вопрос; отказ ничего не пишет', async () => {
+    const { store } = renderRates({ rates: [...seedRates, { id: 'rm3', date: '2026-10-23', currency: 'USD', rate: 82, source: 'manual' }] });
+    fireEvent.click(await screen.findByRole('button', { name: /ручной курс юань \(RMB\) на 23\.10\.2026/ }));
+    fireEvent.change(field(/^Валюта/), { target: { value: 'USD' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
-    await waitFor(async () => expect((await store.load()).rates.find((r) => r.id === 'rm1')?.rate).toBe(11.9));
-    expect((await store.load()).rates).toHaveLength(7);
+    expect(await screen.findByText('На 23.10.2026 уже есть курс USD 82,00 — перезаписать?')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Не перезаписывать' }));
+    await new Promise((r) => setTimeout(r, 20));
+    const rates = (await store.load()).rates;
+    expect(rates).toHaveLength(8);
+    expect(rates.find((r) => r.id === 'rm1')).toMatchObject({ currency: 'CNY', rate: 11.6 });
+    expect(rates.find((r) => r.id === 'rm3')?.rate).toBe(82);
+  });
+
+  it('правка с подтверждением: остаётся один ручной курс на (дата, валюта), без дубля', async () => {
+    const { store } = renderRates({ rates: [...seedRates, { id: 'rm3', date: '2026-10-22', currency: 'CNY', rate: 11.3, source: 'manual' }] });
+    fireEvent.click(await screen.findByRole('button', { name: /ручной курс юань \(RMB\) на 23\.10\.2026/ }));
+    fireEvent.change(field(/^Дата/), { target: { value: '2026-10-22' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    expect(await screen.findByText('На 22.10.2026 уже есть курс юань (RMB) 11,30 — перезаписать?')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Перезаписать' }));
+    await waitFor(async () => expect((await store.load()).rates.some((r) => r.id === 'rm1')).toBe(false));
+    const rates = (await store.load()).rates;
+    expect(rates).toHaveLength(7);
+    const onDate = rates.filter((r) => r.date === '2026-10-22' && r.currency === 'CNY' && r.source === 'manual');
+    expect(onDate).toHaveLength(1);
+    expect(onDate[0].rate).toBe(11.6);
+  });
+
+  it('правка только значения (дата и валюта те же) вопроса не задаёт', async () => {
+    renderRates({ rates: seedRates });
+    fireEvent.click(await screen.findByRole('button', { name: /ручной курс юань \(RMB\) на 23\.10\.2026/ }));
+    fireEvent.change(field(/^Курс/), { target: { value: '11,8' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(() => expect(screen.queryByRole('form', { name: 'Ручной курс' })).toBeNull());
+  });
+
+  it('в заполненной таблице тоже нет кнопки «Добавить курс»', async () => {
+    renderRates({ rates: seedRates });
+    await screen.findByRole('rowheader', { name: '23.10.2026' });
+    expect(screen.queryByRole('button', { name: 'Добавить курс' })).toBeNull();
   });
 
   it('ручной курс можно удалить; автоматический снова становится действующим', async () => {
@@ -148,9 +178,153 @@ describe('экран «Курсы»: статус автокурсов', () => {
     expect(await screen.findByText('Автокурсы не обновлялись с 23.10.2026')).toBeTruthy();
   });
 
-  it('курсов нет — пустое состояние с кнопкой «Добавить курс»', async () => {
+  it('курсов нет — пустое состояние с кнопкой «Курсы на дату»; одновалютной «Добавить курс» нет нигде', async () => {
     renderRates({ rates: [] });
     expect(await screen.findByText('Курсов пока нет')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Добавить курс' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Курсы на дату' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Добавить курс' })).toBeNull();
+  });
+});
+
+describe('экран «Курсы»: курсы трёх валют на дату', () => {
+  const openMulti = async () => {
+    await screen.findByRole('rowheader', { name: '23.10.2026' });
+    fireEvent.click(screen.getByRole('button', { name: 'Курсы на дату' }));
+    return screen.getByRole('form', { name: 'Курсы на дату' });
+  };
+  const setDate = (d: string) => fireEvent.change(field(/^Дата/), { target: { value: d } });
+  const setRate = (label: RegExp, v: string) => fireEvent.change(field(label), { target: { value: v } });
+  const save = () => fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+
+  it('форма открывается на сегодняшней дате, три поля USD, EUR, юань пустые', async () => {
+    renderRates({ rates: seedRates });
+    await openMulti();
+    expect(field(/^Дата/).value).toBe('2026-10-25');
+    expect(field(/^USD/).value).toBe('');
+    expect(field(/^EUR/).value).toBe('');
+    expect(field(/^юань/).value).toBe('');
+  });
+
+  it('три валюты одной датой записываются ручными курсами, дата остаётся, поля показывают сохранённое', async () => {
+    const { store } = renderRates({ rates: seedRates });
+    await openMulti();
+    setDate('2026-10-20');
+    setRate(/^USD/, '82,7');
+    setRate(/^EUR/, '95');
+    setRate(/^юань/, '11,5');
+    save();
+    await waitFor(async () => expect((await store.load()).rates).toHaveLength(10));
+    const added = (await store.load()).rates.filter((r) => r.date === '2026-10-20');
+    expect(added.map((r) => [r.currency, r.rate, r.source]).sort()).toEqual([['CNY', 11.5, 'manual'], ['EUR', 95, 'manual'], ['USD', 82.7, 'manual']]);
+    expect(new Set(added.map((r) => r.id)).size).toBe(3);
+    await screen.findByRole('rowheader', { name: '20.10.2026' });
+    // дата не сбросилась на сегодня, поля не очистились
+    expect(field(/^Дата/).value).toBe('2026-10-20');
+    expect(field(/^USD/).value).toBe('82,7');
+    expect(field(/^EUR/).value).toBe('95');
+    expect(field(/^юань/).value).toBe('11,5');
+  });
+
+  it('при выборе даты поля показывают уже внесённые ручные курсы; курс ВТБ за ручной не выдаётся', async () => {
+    renderRates({ rates: seedRates });
+    await openMulti();
+    setDate('2026-10-23');
+    expect(field(/^юань/).value).toBe('11,6');
+    expect(field(/^USD/).value).toBe('');
+    expect(field(/^EUR/).value).toBe('');
+    setDate('2026-10-22');
+    expect(field(/^юань/).value).toBe('');
+  });
+
+  it('пустое поле не удаляет существующий ручной курс, заполненные соседи сохраняются без вопросов', async () => {
+    const { store } = renderRates({ rates: seedRates });
+    await openMulti();
+    setDate('2026-10-23');
+    setRate(/^юань/, '');
+    setRate(/^USD/, '82');
+    save();
+    await waitFor(async () => expect((await store.load()).rates).toHaveLength(8));
+    const rates = (await store.load()).rates;
+    expect(rates.find((r) => r.id === 'rm1')).toMatchObject({ rate: 11.6, source: 'manual' });
+    expect(rates.find((r) => r.date === '2026-10-23' && r.currency === 'USD' && r.source === 'manual')?.rate).toBe(82);
+    expect(screen.queryByText(/перезаписать/)).toBeNull();
+  });
+
+  it('другое значение поверх ручного курса — вопрос; отказ не пишет ничего, в том числе соседние валюты', async () => {
+    const { store } = renderRates({ rates: seedRates });
+    await openMulti();
+    setDate('2026-10-23');
+    setRate(/^юань/, '11,9');
+    setRate(/^USD/, '82');
+    save();
+    expect(await screen.findByText('На 23.10.2026 уже есть курс юань (RMB) 11,60 — перезаписать?')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Не перезаписывать' }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect((await store.load()).rates).toHaveLength(7);
+    expect((await store.load()).rates.find((r) => r.id === 'rm1')?.rate).toBe(11.6);
+    expect(screen.queryByText(/перезаписать\?/)).toBeNull();
+    expect(field(/^Дата/).value).toBe('2026-10-23');
+  });
+
+  it('подтверждение перезаписывает ту же запись без дубля и записывает остальные валюты', async () => {
+    const { store } = renderRates({ rates: seedRates });
+    await openMulti();
+    setDate('2026-10-23');
+    setRate(/^юань/, '11,9');
+    setRate(/^USD/, '82');
+    save();
+    await screen.findByText(/перезаписать\?/);
+    fireEvent.click(screen.getByRole('button', { name: 'Перезаписать' }));
+    await waitFor(async () => expect((await store.load()).rates.find((r) => r.id === 'rm1')?.rate).toBe(11.9));
+    const rates = (await store.load()).rates;
+    expect(rates).toHaveLength(8);
+    expect(rates.filter((r) => r.date === '2026-10-23' && r.currency === 'CNY' && r.source === 'manual')).toHaveLength(1);
+    expect(field(/^Дата/).value).toBe('2026-10-23');
+  });
+
+  it('то же значение, что уже стоит, ничего не пишет и ничего не спрашивает', async () => {
+    const { store } = renderRates({ rates: seedRates });
+    await openMulti();
+    setDate('2026-10-23');
+    save();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText(/перезаписать/)).toBeNull();
+    expect((await store.load()).rates).toHaveLength(7);
+  });
+
+  it('неверное число — ошибка у поля, ни одна валюта не записана', async () => {
+    const { store } = renderRates({ rates: seedRates });
+    await openMulti();
+    setDate('2026-10-24');
+    setRate(/^EUR/, '95');
+    setRate(/^USD/, '82о');
+    save();
+    expect(await screen.findByText('Введите число')).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 20));
+    expect((await store.load()).rates).toHaveLength(7);
+  });
+
+  it('курс ≤ 0 — ошибка у поля; даты нет — «Укажите дату»; ничего не записано', async () => {
+    const { store } = renderRates({ rates: seedRates });
+    await openMulti();
+    setDate('2026-10-24');
+    setRate(/^EUR/, '0');
+    save();
+    expect(await screen.findByText('Введите курс больше нуля')).toBeTruthy();
+    setRate(/^EUR/, '95');
+    setDate('');
+    save();
+    expect(await screen.findByText('Укажите дату')).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 20));
+    expect((await store.load()).rates).toHaveLength(7);
+  });
+
+  it('ничего не заполнено — подсказка, записи нет', async () => {
+    const { store } = renderRates({ rates: seedRates });
+    await openMulti();
+    setDate('2026-10-24');
+    save();
+    expect(await screen.findByText('Введите курс хотя бы одной валюты')).toBeTruthy();
+    expect((await store.load()).rates).toHaveLength(7);
   });
 });

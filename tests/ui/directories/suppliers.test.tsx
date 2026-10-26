@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { baseSeed, renderAt } from './helpers';
+import { suggestionValues } from '../components/suggest';
 
 const input = (label: RegExp) => screen.getByLabelText(label) as HTMLInputElement;
 const type = (label: RegExp, value: string) => fireEvent.change(input(label), { target: { value } });
 
 describe('карточка поставщика: город и провинция', () => {
   it('известный город — провинция подставляется сама, подсказки берутся из справочника городов', async () => {
-    const { container } = renderAt('/suppliers/new', baseSeed);
+    renderAt('/suppliers/new', baseSeed);
     await screen.findByRole('heading', { name: 'Новый поставщик' });
     type(/^Город/, 'Гуан');
-    const options = [...container.querySelectorAll('datalist option')].map((o) => o.getAttribute('value'));
+    const options = suggestionValues(input(/^Город/));
     expect(options).toContain('Гуанчжоу');
     expect(options).not.toContain('Нинбо');
     type(/^Город/, 'Гуанчжоу');

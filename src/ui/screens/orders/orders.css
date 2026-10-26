@@ -9,7 +9,7 @@
 .so-block__warn { color: #8a5a00; }
 .so-block__summary { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-start; margin-bottom: 12px; }
 .so-block__ad { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: flex-start; }
-.so-block__ad .field { width: 120px; }
+.so-block__ad .field { width: 260px; }
 .so-block__ad > .btn, .so-block__ad > .small { margin-top: 28px; }
 .so-block__ad .field__hint, .so-block__ad .field__error { white-space: nowrap; }
 .so-totals { display: flex; flex-wrap: wrap; gap: 8px 10px; margin: 0; flex: 1 1 420px; }
@@ -125,3 +125,10 @@
 .cmp-total > span { display: block; }
 .cmp-total__sum { font-weight: 600; }
 .cmp-order { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; margin-top: 12px; padding: 8px 12px; background: var(--c-bg); border-radius: var(--radius); font-variant-numeric: tabular-nums; }
+
+/* Ячейка «Расч. коэфф.» — поле ввода в строке таблицы (G23); пусто — коэффициент поставщика бледной подсказкой. */
+.coef-cell { display: inline-flex; align-items: center; justify-content: flex-end; gap: 1px; }
+.table.lines-table .coef-input { width: 3.2rem; min-width: 0; text-align: right; }
+.table.lines-table .coef-input.ad-own { padding: 2px 5px; border-radius: var(--radius); }
+.table.lines-table .coef-input::placeholder { color: var(--c-muted); opacity: 0.8; }
+.coef-error { font-size: 0.72rem; white-space: normal; max-width: 5rem; text-align: right; margin-left: auto; }

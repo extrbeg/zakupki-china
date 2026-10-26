@@ -14,7 +14,7 @@ const col = (def: SheetDef, key: string) => def.columns.findIndex((c) => c.key =
 describe('SHEETS', () => {
   it('описывает все листы interfaces.md §6 в нужном порядке', () => {
     expect(SHEETS.map((s) => s.sheet)).toEqual([
-      '_meta', 'Настройки', 'Лог', 'Курсы', 'Списки', 'Города', 'Поставщики', 'Платежные агенты', 'Перевозчики',
+      '_meta', 'Настройки', 'Лог', 'Курсы', 'Списки', 'Страны', 'Провинции', 'Города', 'Поставщики', 'Платежные агенты', 'Перевозчики',
       'Заказы', 'Поставщики в заказе', 'Позиции', 'Поставки', 'Партии', 'Декларации', 'Затраты',
     ]);
     expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(1);
@@ -40,6 +40,16 @@ describe('SHEETS', () => {
       'id', 'entryDate', 'paymentDate', 'status', 'targetType', 'targetId', 'costType', 'payeeType', 'payeeId', 'payeeText',
       'executor', 'invoiceNumber', 'invoiceDate', 'amount', 'currency', 'rate', 'rateDate', 'rateManual', 'amountRub', 'comment',
     ]);
+  });
+
+  it('G21: «Страны», «Провинции»; страна города, поставщика и агента — новые колонки в конце (старые таблицы догоняются)', () => {
+    expect(sheet('countries').columns.map((c) => [c.key, c.header])).toEqual([['id', 'id'], ['name', 'Страна']]);
+    expect(sheet('provinces').columns.map((c) => [c.key, c.header])).toEqual([['id', 'id'], ['name', 'Провинция'], ['countryId', 'countryId']]);
+    expect(sheet('cities').columns.map((c) => c.key)).toEqual(['id', 'city', 'province', 'population', 'countryId']);
+    expect(sheet('suppliers').columns.at(-1)).toMatchObject({ key: 'country', header: 'Страна', type: 'string' });
+    expect(sheet('suppliers').columns.at(-2)).toMatchObject({ key: 'createdAt' });
+    expect(sheet('agents').columns.at(-1)).toMatchObject({ key: 'country', header: 'Страна', type: 'string' });
+    expect(sheet('agents').columns.at(-2)).toMatchObject({ key: 'comment' });
   });
 
   it('формульные колонки перевода в «Позиции»', () => {

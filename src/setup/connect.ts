@@ -9,6 +9,7 @@ import type { PickOptions } from '../google/picker';
 import { toStoreError } from '../store/sheetsStore';
 import { getBinding, setBinding } from './binding';
 import { ensureSchema, NotAppSpreadsheetError, type SchemaReport } from './ensureSchema';
+import { ensureGeography } from './geography';
 import { installScript, readMeta, SCRIPT_VERSION, type ScriptDeps, type ScriptInstallResult } from './installScript';
 
 export const NEW_SPREADSHEET_TITLE = 'Закупки Китай';
@@ -26,11 +27,12 @@ export function googleSheetsApi(): SheetsApi {
 
 export interface BindResult { spreadsheetId: string; schema: SchemaReport; script: ScriptInstallResult }
 
-/** Привести таблицу к схеме, поставить скрипт и запомнить привязку. Чужая таблица — NotAppSpreadsheetError; ошибки таблицы — StoreError; сбой скрипта — в результате. */
+/** Привести таблицу к схеме, внести справочник Китая (G20), поставить скрипт и запомнить привязку. Чужая таблица — NotAppSpreadsheetError; ошибки таблицы — StoreError; сбой скрипта — в результате. */
 export async function bindSpreadsheet(api: SheetsApi, email: string, spreadsheetId: string, deps?: ScriptDeps): Promise<BindResult> {
   let schema: SchemaReport;
   try {
     schema = await ensureSchema(api, spreadsheetId);
+    await ensureGeography(api, spreadsheetId);
   } catch (e) {
     if (e instanceof NotAppSpreadsheetError) throw e;   // отказ с текстом — показать как есть
     throw toStoreError(e);
@@ -52,7 +54,8 @@ export async function createAndBind(api: SheetsApi, email: string, deps?: Script
 }
 
 /**
- * Привязка, запомненная для email: таблица догоняет схему (обновление приложения), устаревший скрипт обновляется.
+ * Привязка, запомненная для email: таблица догоняет схему (обновление приложения) и справочник Китая (один раз, по geoVersion),
+ * устаревший скрипт обновляется.
  * Таблица удалена или доступа больше нет — привязка снимается, возвращается null. Сбой сети — StoreError.
  */
 export async function restoreBinding(api: SheetsApi, email: string, deps?: ScriptDeps): Promise<string | null> {
@@ -60,6 +63,7 @@ export async function restoreBinding(api: SheetsApi, email: string, deps?: Scrip
   if (!spreadsheetId) return null;
   try {
     await ensureSchema(api, spreadsheetId);
+    await ensureGeography(api, spreadsheetId);
   } catch (e) {
     if (e instanceof GoogleApiError && (e.status === 404 || e.status === 403)) {
       setBinding(email, null);

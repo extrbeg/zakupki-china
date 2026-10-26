@@ -6,6 +6,7 @@ import { LocalStore } from '../../../src/store/localStore';
 import type { Cost, Dataset, Rate } from '../../../src/domain/model';
 import CostsScreen from '../../../src/ui/screens/costs/CostsScreen';
 import { computeCosting } from '../../../src/domain/costing';
+import { pickSuggestion } from '../components/suggest';
 
 let counter = 0;
 
@@ -367,7 +368,7 @@ describe('форма затраты: тип, получатель, реквиз�
     set(/^Объект привязки/, 'sh1');
     set(/^Тип затраты/, 'Комиссия агента');
     set(/^Кому платим/, 'agent');
-    set(/^Получатель/, 'a1');
+    pickSuggestion(screen.getByLabelText(/^Получатель/), 'Агент Один');
     set(/^Исполнитель операции/, 'Иванов');
     set(/^Номер счёта/, 'INV-7');
     set(/^Дата счёта/, '2026-10-20');

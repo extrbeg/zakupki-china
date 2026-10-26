@@ -6,7 +6,8 @@ import { newId } from '../../domain/ids';
 import type { Supplier } from '../../domain/model';
 import { useData } from '../DataContext';
 import { ConfirmDelete, ErrorBanner, FormGrid, ListSelectField, TextField } from '../components';
-import { CityProvinceFields } from './CityProvinceFields';
+import { PlaceFields } from './PlaceFields';
+import { citiesOfCountry, defaultCountryName } from './geography';
 import { validateCityProvince } from './cityLookup';
 import { resolveCityPair } from './cityPair';
 import { cleanRecord, validateName } from './records';
@@ -35,14 +36,17 @@ export function SupplierCard({ supplier }: { supplier?: Supplier }) {
     onChange: (v: string | undefined) => setDraft((d) => ({ ...d, [key]: v })),
   });
 
+  // страна по умолчанию — Китай под текущим названием (F3); считается по загруженному набору, а не при открытии формы
+  const country = draft.country ?? defaultCountryName(ds);
+
   const save = async () => {
-    const found = { ...validateName(draft.name), ...validateCityProvince(ds.cities, draft.city, draft.province) };
+    const found = { ...validateName(draft.name), ...validateCityProvince(citiesOfCountry(ds, country), draft.city, draft.province) };
     setErrors(found);
     if (Object.keys(found).length > 0) return;
     setBusy(true);
     setSaveError(undefined);
     try {
-      const pair = await resolveCityPair(data, draft.city, draft.province);
+      const pair = await resolveCityPair(data, draft.city, draft.province, country);
       const record = cleanRecord<Supplier>({
         ...draft,
         ...pair,
@@ -79,8 +83,8 @@ export function SupplierCard({ supplier }: { supplier?: Supplier }) {
           <TextField label="Телефон" type="tel" {...text('phone')} />
           <TextField label="Почта" type="email" {...text('email')} />
           <TextField label="Сайт" type="url" {...text('website')} />
-          <CityProvinceFields
-            cities={ds.cities} city={draft.city} province={draft.province} provinceError={errors.province}
+          <PlaceFields
+            ds={ds} value={{ ...draft, country }} provinceError={errors.province}
             onChange={(next) => setDraft((d) => ({ ...d, ...next }))}
           />
           <TextField label="Адрес" {...text('address')} />

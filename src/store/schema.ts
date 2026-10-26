@@ -25,20 +25,24 @@ export const SHEETS: SheetDef[] = [
   { entity: 'log', sheet: 'Лог', columns: [c('time', 'Время', 'datetime'), c('level', 'Уровень'), c('message', 'Сообщение'), c('details', 'Подробности')] },
   { entity: 'rates', sheet: 'Курсы', columns: [id, c('date', 'Дата', 'date'), c('currency', 'Валюта'), c('rate', 'Курс', 'number'), c('source', 'Источник'), c('loadedAt', 'Загружено', 'datetime'), c('comment', 'Комментарий')] },
   { entity: 'lists', sheet: 'Списки', columns: [id, c('list', 'Список'), c('value', 'Значение'), c('order', 'Порядок', 'int')] },
-  { entity: 'cities', sheet: 'Города', columns: [id, c('city', 'Город'), c('province', 'Провинция'), c('population', 'Население', 'int')] },
+  // G21: география. Провинция у города — названием; countryId, страна поставщика и агента — в конце, ensureSchema дописывает их в старые таблицы.
+  { entity: 'countries', sheet: 'Страны', columns: [id, c('name', 'Страна')] },
+  { entity: 'provinces', sheet: 'Провинции', columns: [id, c('name', 'Провинция'), c('countryId', 'countryId')] },
+  { entity: 'cities', sheet: 'Города', columns: [id, c('city', 'Город'), c('province', 'Провинция'), c('population', 'Население', 'int'), c('countryId', 'countryId')] },
   {
     entity: 'suppliers', sheet: 'Поставщики', columns: [
       id, c('name', 'Компания'), c('companyType', 'Тип компании'), c('direction', 'Направление'), c('specialization', 'Специализация'),
       c('products', 'Продукция/услуги'), c('priceNote', 'Цена'), c('contactPerson', 'Контактное лицо'), c('phone', 'Телефон'), c('email', 'Почта'),
       c('city', 'Город'), c('province', 'Провинция'), c('address', 'Адрес'), c('website', 'Сайт'), c('bankBeneficiary', 'Получатель'),
       c('bankName', 'Банк'), c('bankAccount', 'Счёт'), c('bankSwift', 'SWIFT'), c('bankAddress', 'Адрес банка'), c('comment', 'Комментарий'),
-      c('createdAt', 'Создан', 'datetime'),
+      c('createdAt', 'Создан', 'datetime'), c('country', 'Страна'),
     ],
   },
   {
     entity: 'agents', sheet: 'Платежные агенты', columns: [
       id, c('name', 'Наименование'), c('contactPerson', 'Контактное лицо'), c('legalAddress', 'Юридический адрес'), c('city', 'Город'),
       c('province', 'Провинция'), c('phone', 'Телефон'), c('email', 'email'), c('requisites', 'Реквизиты'), c('comment', 'Комментарий'),
+      c('country', 'Страна'),
     ],
   },
   {

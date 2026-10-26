@@ -1,5 +1,5 @@
 // Блок «Поставщик в заказе» (G02): заголовок — код <заказ>-<n>, поставщик, валюта, курс на дату расчёта с датой курса,
-// AD поставщика с подсказкой по истории, итоги поставщика; сразу под ним таблица товаров. Реквизиты свёрнуты.
+// расчётный коэффициент поставщика (AD) с подсказкой по истории, итоги поставщика; сразу под ним таблица товаров. Реквизиты свёрнуты.
 // AD поставщика сохраняется сразу при изменении (очередь записей, см. saveCoef).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -11,6 +11,7 @@ import { ErrorBanner, NumberField, isBadNumber } from '../../components';
 import { CURRENCY_LABEL, formatDate, formatMoney, formatRate } from '../../format';
 import { LinesSection } from './LinesSection';
 import { buildLineRows, sumLineRows } from './linesLogic';
+import { AD_SUPPLIER_LABEL } from './coefLabels';
 import { bitrixTaskUrl, compact, suggestionBasis, suggestionText, supplierOrderCode } from './orderLogic';
 import { RATE_SOURCE_TEXT, SupplierOrderForm } from './SupplierOrderForm';
 import { usePurchased } from './purchasedQueue';
@@ -94,7 +95,7 @@ function ExistingBlock({ order, so, code }: { order: Order; so: SupplierOrder; c
   const onCoef = (v: number | undefined) => {
     setAdValue(v);
     if (isBadNumber(v)) { setAdError(undefined); return; }   // «Введите число» показывает само поле
-    if (v !== undefined && v <= 0) { setAdError('AD должен быть больше нуля'); return; }
+    if (v !== undefined && v <= 0) { setAdError('Расчётный коэффициент должен быть больше нуля'); return; }
     setAdError(undefined);
     saveCoef(v);
   };
@@ -115,14 +116,14 @@ function ExistingBlock({ order, so, code }: { order: Order; so: SupplierOrder; c
       <div className="so-block__summary">
         <div className="so-block__ad">
           <NumberField
-            label="AD поставщика" value={adValue} onChange={onCoef} error={adError} placeholder="—"
+            label={AD_SUPPLIER_LABEL} value={adValue} onChange={onCoef} error={adError} placeholder="—"
             hint={so.coef === undefined ? 'не задан — нет прогноза' : undefined}
           />
           {suggestion.value === null ? (
             <span className="small muted">{suggestionText(suggestion)}</span>
           ) : (
             <button
-              type="button" className="btn btn--small" title={`Медиана AW закрытых позиций ${suggestionBasis(suggestion)}`}
+              type="button" className="btn btn--small" title={`Медиана фактических коэффициентов (AW) закрытых позиций ${suggestionBasis(suggestion)}`}
               onClick={() => { const v = suggestion.value ?? undefined; setAdError(undefined); setAdValue(v); saveCoef(v); }}
             >
               {suggestionText(suggestion)}

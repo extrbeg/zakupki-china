@@ -19,6 +19,7 @@ import SuppliersScreen from './screens/suppliers/SuppliersScreen';
 import SupplierScreen from './screens/suppliers/SupplierScreen';
 import AgentsScreen from './screens/agents/AgentsScreen';
 import CarriersScreen from './screens/carriers/CarriersScreen';
+import GeographyScreen from './screens/geography/GeographyScreen';
 import ListsScreen from './screens/lists/ListsScreen';
 import SettingsScreen from './screens/settings/SettingsScreen';
 import ImportScreen from './screens/import/ImportScreen';
@@ -39,6 +40,7 @@ export function AppRoutes() {
       <Route path="/suppliers/:id" element={<SupplierScreen />} />
       <Route path="/agents" element={<AgentsScreen />} />
       <Route path="/carriers" element={<CarriersScreen />} />
+      <Route path="/geography" element={<GeographyScreen />} />
       <Route path="/lists" element={<ListsScreen />} />
       <Route path="/settings" element={<SettingsScreen />} />
       <Route path="/import" element={<ImportScreen />} />

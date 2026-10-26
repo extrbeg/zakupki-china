@@ -26,3 +26,5 @@ export { ListSelectField, ADD_LIST_VALUE_LABEL } from './ListSelectField';
 export type { ListSelectFieldProps } from './ListSelectField';
 export { DirectorySelectField, NEW_DIRECTORY_LABEL } from './DirectorySelectField';
 export type { DirectoryEntity, DirectorySelectFieldProps } from './DirectorySelectField';
+export { SuggestInput, Highlight, NO_MATCHES_TEXT } from './SuggestInput';
+export type { Suggestion, SuggestInputProps } from './SuggestInput';

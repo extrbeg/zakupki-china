@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mapLegacy, type LegacyRaw } from '../../src/import';
 import type { Cost, Line, Order, SupplierOrder } from '../../src/domain/model';
 import { SYNTHETIC_LEGACY, serial } from '../../fixtures/legacy/synthetic';
+import { CHINA_COUNTRY_ID } from '../../src/data/geo';
 
 const TODAY = '2026-10-25';
 const plan = () => mapLegacy(SYNTHETIC_LEGACY, TODAY);
@@ -188,14 +189,25 @@ describe('mapLegacy — справочники, города, курсы', () =>
     expect(of('customer')).toEqual(['Иванов', 'Петров']);
   });
 
-  it('города: L/M — провинция, T/U — население', () => {
+  it('города: L/M — провинция, T/U — население; пустая провинция — из справочника Китая (G20), страна — Китай', () => {
     const { data } = plan();
     const cities = [...(data.cities ?? [])].sort((a, b) => a.city.localeCompare(b.city)).map(({ city, province, population }) => ({ city, province, population }));
     expect(cities).toEqual([
-      { city: 'Lhasa', province: '', population: 900000 },
+      { city: 'Lhasa', province: 'Tibet', population: 900000 },
       { city: 'Ningbo', province: 'Zhejiang', population: 9618000 },
       { city: 'Taizhou', province: 'Zhejiang', population: 6622000 },
     ]);
+    expect((data.cities ?? []).every((c) => c.countryId === CHINA_COUNTRY_ID)).toBe(true);
+  });
+
+  it('провинция из старой таблицы главнее справочника; город в двух провинциях без провинции не угадывается', () => {
+    const raw: LegacyRaw = { sheets: { 'Списки': { hidden: false, values: [
+      ['Тип компании', 'Город', 'Провинция города', 'Город', 'Население*'],
+      ['', 'Ningbo', 'Своя провинция', 'Taizhou', 100],
+    ] } } };
+    const cities = mapLegacy(raw, TODAY).data.cities ?? [];
+    expect(cities.find((c) => c.city === 'Ningbo')?.province).toBe('Своя провинция');
+    expect(cities.find((c) => c.city === 'Taizhou')?.province).toBe('');
   });
 
   it('курсы ВТБ из X:Z переносятся как ручные, RMB → CNY', () => {

@@ -1,6 +1,7 @@
 // Чистая логика экрана «Себестоимость»: строки таблицы, отклонение AW от AD, предупреждения выбора, строки отчёта.
 // Выбор заказов — только фильтр показа: движок считает всё по всем данным (R18.1).
 
+import { AD_LABEL, AW_LABEL } from '../orders/coefLabels';
 import { COST_CATEGORIES, COST_CATEGORY_LABEL, type BatchCost, type CostCategory, type CostWarning, type CostingResult, type LineCost } from '../../../domain/costing';
 import type { Dataset, ISODate, Line, Order, Supplier, SupplierOrder } from '../../../domain/model';
 import type { ReportRow } from '../../../store/types';
@@ -145,8 +146,8 @@ const r2 = (n: number | null | undefined): number | null => (n === null || n ===
 export function buildReportRows(ds: Dataset, rows: CostingRow[], selected: ReadonlySet<string>, today: ISODate): ReportRow[] {
   const numbers = ds.orders.filter((o) => selected.has(o.id)).map((o) => o.number).sort((a, b) => a - b).join(', ');
   const header = [
-    'Заказ', 'Поставщик', '№', 'Позиция', 'Кол-во', 'Цена в валюте', 'Валюта', 'Y, ₽', 'AB', 'AD',
-    'Себестоимость позиции, ₽', 'AV, ₽/шт', 'AW', 'Отклонение, %', 'Статус',
+    'Заказ', 'Поставщик', '№', 'Позиция', 'Кол-во', 'Цена в валюте', 'Валюта', 'Y, ₽', 'AB', AD_LABEL,
+    'Себестоимость позиции, ₽', 'AV, ₽/шт', AW_LABEL, 'Отклонение, %', 'Статус',
     ...COST_CATEGORIES.map((k) => `${COST_CATEGORY_LABEL[k]}, ₽`),
   ];
   const out: ReportRow[] = [

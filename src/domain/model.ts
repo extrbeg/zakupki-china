@@ -11,9 +11,15 @@ export type ListKey = 'payer' | 'department' | 'customer' | 'costType' | 'compan
 
 export interface Rate { id: string; date: ISODate; currency: Exclude<Currency, 'RUB'>; rate: number; source: 'vtb' | 'manual'; loadedAt?: string; comment?: string }
 export interface ListItem { id: string; list: ListKey; value: string; order: number }
-export interface City { id: string; city: string; province: string; population?: number }
-export interface Supplier { id: string; name: string; companyType?: string; direction?: string; specialization?: string; products?: string; priceNote?: string; contactPerson?: string; phone?: string; email?: string; city?: string; province?: string; address?: string; website?: string; bankBeneficiary?: string; bankName?: string; bankAccount?: string; bankSwift?: string; bankAddress?: string; comment?: string; createdAt?: string }
-export interface PaymentAgent { id: string; name: string; contactPerson?: string; legalAddress?: string; city?: string; province?: string; phone?: string; email?: string; requisites?: string; comment?: string }
+export interface Country { id: string; name: string }
+export interface Province { id: string; name: string; countryId: string }
+/**
+ * Город. Провинция — названием (как у поставщика и агента): так читаются старые строки «Города» без справочника провинций.
+ * countryId — ссылка на «Страны»; в старых строках его нет — такие города считаются городами Китая (CHINA_COUNTRY_ID).
+ */
+export interface City { id: string; city: string; province: string; countryId?: string; population?: number }
+export interface Supplier { id: string; name: string; companyType?: string; direction?: string; specialization?: string; products?: string; priceNote?: string; contactPerson?: string; phone?: string; email?: string; city?: string; province?: string; address?: string; website?: string; bankBeneficiary?: string; bankName?: string; bankAccount?: string; bankSwift?: string; bankAddress?: string; comment?: string; createdAt?: string; country?: string /* название страны */ }
+export interface PaymentAgent { id: string; name: string; contactPerson?: string; legalAddress?: string; city?: string; province?: string; phone?: string; email?: string; requisites?: string; comment?: string; country?: string /* название страны */ }
 export interface Carrier { id: string; name: string; type?: string; specialization?: string; contactPerson?: string; phone?: string; email?: string; website?: string; contracts?: string; contractValidUntil?: ISODate; contractSigned?: boolean; comment?: string }
 export interface Order { id: string; number: number; date: ISODate; department?: string; payer?: string; customer?: string; title?: string; bitrixTaskId?: string; calcDate?: ISODate; costsComplete: boolean; comment?: string; createdAt?: string }
 export interface SupplierOrder { id: string; orderId: string; seq: number; supplierId: string; bitrixTaskId?: string; currency: Currency; calcDate?: ISODate; calcRate?: number; paymentTerms?: string; plannedMode?: ShipmentMode; launchDate?: ISODate; productionDays?: number; actualReadyDate?: ISODate; comment?: string; coef?: number /* прогнозный AD поставщика; позиции без своего AD берут его */ }
@@ -24,23 +30,23 @@ export interface Declaration { id: string; shipmentId: string; number?: string; 
 export interface Cost { id: string; entryDate: ISODate; paymentDate?: ISODate; status: CostStatus; targetType: CostTargetType; targetId: string; costType: string; payeeType?: PayeeType; payeeId?: string; payeeText?: string; executor?: string; invoiceNumber?: string; invoiceDate?: ISODate; amount?: number; currency: Currency; rate?: number; rateDate?: ISODate; rateManual: boolean; amountRub?: number; comment?: string }
 
 export interface Dataset {
-  rates: Rate[]; lists: ListItem[]; cities: City[]; suppliers: Supplier[]; agents: PaymentAgent[]; carriers: Carrier[];
+  rates: Rate[]; lists: ListItem[]; countries: Country[]; provinces: Province[]; cities: City[]; suppliers: Supplier[]; agents: PaymentAgent[]; carriers: Carrier[];
   orders: Order[]; supplierOrders: SupplierOrder[]; lines: Line[]; shipments: Shipment[]; batches: Batch[]; declarations: Declaration[]; costs: Cost[];
   settings: Record<string, string>;   // лист «Настройки»: ratesSourceUrl, bitrixPortalUrl, vatRateDefault
-  meta: Record<string, string>;       // лист «_meta»: schemaVersion, scriptId, appVersion
+  meta: Record<string, string>;       // лист «_meta»: schemaVersion, scriptId, appVersion, geoVersion
 }
 export type EntityName = Exclude<keyof Dataset, 'settings' | 'meta'>;
 
 /** Все сущности-массивы набора в порядке листов. */
 export const ENTITY_NAMES: readonly EntityName[] = [
-  'rates', 'lists', 'cities', 'suppliers', 'agents', 'carriers',
+  'rates', 'lists', 'countries', 'provinces', 'cities', 'suppliers', 'agents', 'carriers',
   'orders', 'supplierOrders', 'lines', 'shipments', 'batches', 'declarations', 'costs',
 ];
 
 /** Пустой набор данных. */
 export function emptyDataset(): Dataset {
   return {
-    rates: [], lists: [], cities: [], suppliers: [], agents: [], carriers: [],
+    rates: [], lists: [], countries: [], provinces: [], cities: [], suppliers: [], agents: [], carriers: [],
     orders: [], supplierOrders: [], lines: [], shipments: [], batches: [], declarations: [], costs: [],
     settings: {}, meta: {},
   };

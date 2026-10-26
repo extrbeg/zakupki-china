@@ -10,6 +10,10 @@ const set = (el: HTMLElement, value: string) => fireEvent.change(el, { target: {
 const block = (code: string) => screen.getByRole('region', { name: `Поставщик в заказе ${code}` });
 const cell = (row: HTMLElement, col: string) => flat(row.querySelector(`[data-col="${col}"]`)?.textContent);
 const num = (s: string) => Number(s.replace('−', '-').replace(',', '.'));
+const AD_FIELD = /^Расчётный коэффициент себестоимости доставки \(для всех товаров поставщика\)/;
+/** Ячейка «Расч. коэфф.» строки — поле ввода: своё значение в value, иначе коэффициент поставщика в placeholder. */
+const adInput = (row: HTMLElement) => row.querySelector('[data-col="AD"] input') as HTMLInputElement;
+const adShown = (row: HTMLElement) => adInput(row).value || adInput(row).placeholder;
 const termOf = (scope: HTMLElement, label: string) => flat(within(scope).getByText(label).nextElementSibling?.textContent);
 
 /**
@@ -43,7 +47,7 @@ describe('блок поставщика: заголовок и таблица т
     expect(head.textContent).toContain('Alpha Valve');
     expect(within(b).getByText(/юань \(RMB\)/)).toBeTruthy();
     expect(within(b).getByText(/10,00 на 01\.10\.2026/)).toBeTruthy();
-    expect((within(b).getByLabelText(/^AD поставщика/) as HTMLInputElement).value).toBe('1,4');
+    expect((within(b).getByLabelText(AD_FIELD) as HTMLInputElement).value).toBe('1,4');
     expect(within(b).getByRole('table', { name: 'Товары 12-1' })).toBeTruthy();
     expect(within(b).getByText('Кран DN50')).toBeTruthy();
     // реквизиты свёрнуты
@@ -60,8 +64,8 @@ describe('блок поставщика: заголовок и таблица т
     const table = await screen.findByRole('table', { name: 'Товары 12-1' });
     const heads = within(table).getAllByRole('columnheader').map((th) => (th.textContent ?? '').replace(/\s+/g, ' ').trim());
     expect(heads.slice(0, 15)).toEqual([
-      'В работу', '№', 'Товар', 'Кол-во', 'Цена, CNY', 'Сумма, CNY', 'Цена ₽/шт', 'Сумма ₽', 'AD',
-      'Прогноз ₽/шт (AB)', 'Прогноз ₽ на кол-во', 'Себест. ₽/шт (AV)', 'Себест. ₽ на кол-во', 'AW', 'Откл.',
+      'В работу', '№', 'Товар', 'Кол-во', 'Цена, CNY', 'Сумма, CNY', 'Цена ₽/шт', 'Сумма ₽', 'Расч. коэфф.',
+      'Прогноз ₽/шт (AB)', 'Прогноз ₽ на кол-во', 'Себест. ₽/шт (AV)', 'Себест. ₽ на кол-во', 'Факт. коэфф.', 'Откл.',
     ]);
   });
 
@@ -70,26 +74,29 @@ describe('блок поставщика: заголовок и таблица т
     await screen.findByText('Задвижка');
     const r1 = screen.getByTestId('line-ln1');
     expect([cell(r1, 'qty'), cell(r1, 'price'), cell(r1, 'X'), cell(r1, 'Y'), cell(r1, 'Z')]).toEqual(['1000', '5,00', '5000,00', '50,00', '50000,00']);
-    expect([cell(r1, 'AD'), cell(r1, 'AB'), cell(r1, 'ABqty')]).toEqual(['1,5', '75,00', '75000,00']);
+    expect([adShown(r1), cell(r1, 'AB'), cell(r1, 'ABqty')]).toEqual(['1,5', '75,00', '75000,00']);
     expect([cell(r1, 'AV'), cell(r1, 'AVqty')]).toEqual(['50,00', '50000,00']);
     expect(cell(r1, 'AW')).toMatch(/^1,00/);
     expect(cell(r1, 'dev')).toBe('−33,3%');
     // ln3 без своего AD — берёт AD поставщика 1,4
     const r3 = screen.getByTestId('line-ln3');
-    expect([cell(r3, 'AD'), cell(r3, 'AB'), cell(r3, 'ABqty')]).toEqual(['1,4', '280,00', '2800,00']);
+    expect([adShown(r3), cell(r3, 'AB'), cell(r3, 'ABqty')]).toEqual(['1,4', '280,00', '2800,00']);
     expect([cell(r3, 'AV'), cell(r3, 'AVqty')]).toEqual(['200,00', '2000,00']);
     expect(cell(r3, 'dev')).toBe('−28,6%');
     // своё AD выделено, AD поставщика — нет
-    expect(r1.querySelector('[data-col="AD"] .ad-own')).not.toBeNull();
-    expect(r3.querySelector('[data-col="AD"] .ad-own')).toBeNull();
+    expect(adInput(r1).classList.contains('ad-own')).toBe(true);
+    expect(adInput(r1).value).toBe('1,5');
+    expect(adInput(r3).classList.contains('ad-own')).toBe(false);
+    expect(adInput(r3).value).toBe('');           // пусто — коэффициент поставщика показан приглушённо подсказкой
+    expect(adInput(r3).placeholder).toBe('1,4');
   });
 });
 
-describe('AD поставщика', () => {
+describe('расчётный коэффициент поставщика', () => {
   it('сохраняется сразу; позиции без своего AD пересчитываются, со своим — нет', async () => {
     const { store } = renderAt('/orders/o12', adSeed());
     await screen.findByText('Задвижка');
-    set(within(block('12-1')).getByLabelText(/^AD поставщика/), '2');
+    set(within(block('12-1')).getByLabelText(AD_FIELD), '2');
     await waitFor(() => expect(cell(screen.getByTestId('line-ln3'), 'AB')).toBe('400,00'));
     expect(cell(screen.getByTestId('line-ln1'), 'AB')).toBe('75,00');
     await waitFor(async () => expect((await store.load()).supplierOrders.find((s) => s.id === 'so1')?.coef).toBe(2));
@@ -98,9 +105,9 @@ describe('AD поставщика', () => {
   it('неверный AD — ошибка у поля, не сохраняется', async () => {
     const { store } = renderAt('/orders/o12', adSeed());
     await screen.findByText('Задвижка');
-    const ad = within(block('12-1')).getByLabelText(/^AD поставщика/);
+    const ad = within(block('12-1')).getByLabelText(AD_FIELD);
     set(ad, '0');
-    expect(await within(block('12-1')).findByText('AD должен быть больше нуля')).toBeTruthy();
+    expect(await within(block('12-1')).findByText('Расчётный коэффициент должен быть больше нуля')).toBeTruthy();
     set(ad, 'abc');
     expect(within(block('12-1')).getByText('Введите число')).toBeTruthy();
     expect((await store.load()).supplierOrders.find((s) => s.id === 'so1')?.coef).toBe(1.4);
@@ -119,18 +126,19 @@ describe('AD поставщика', () => {
     await screen.findByText('Задвижка');
     fireEvent.click(within(block('12-1')).getByRole('button', { name: /подсказка 1,50 \(по 3 закрытым позициям\)/ }));
     await waitFor(async () => expect((await store.load()).supplierOrders.find((s) => s.id === 'so1')?.coef).toBe(1.5));
-    expect((within(block('12-1')).getByLabelText(/^AD поставщика/) as HTMLInputElement).value).toBe('1,5');
+    expect((within(block('12-1')).getByLabelText(AD_FIELD) as HTMLInputElement).value).toBe('1,5');
   });
 
   it('«как у поставщика» снимает своё AD позиции', async () => {
     const { store } = renderAt('/orders/o12', adSeed());
     await screen.findByText('Задвижка');
-    fireEvent.click(within(screen.getByTestId('line-ln1')).getByRole('button', { name: 'AD позиции 1 как у поставщика' }));
+    fireEvent.click(within(screen.getByTestId('line-ln1')).getByRole('button', { name: 'Расчётный коэффициент позиции 1: как у поставщика' }));
     await waitFor(() => expect(cell(screen.getByTestId('line-ln1'), 'AB')).toBe('70,00'));
     const ln1 = (await store.load()).lines.find((l) => l.id === 'ln1');
     expect(ln1?.coef).toBeUndefined();
     expect(ln1?.customerName).toBe('Кран DN50');
     expect(screen.getByTestId('line-ln1').querySelector('.ad-own')).toBeNull();
+    expect(adInput(screen.getByTestId('line-ln1')).value).toBe('');
   });
 });
 
@@ -208,13 +216,13 @@ describe('«Подробнее» — полная форма позиции', ()
     await screen.findByText('Задвижка');
     fireEvent.click(within(block('12-1')).getByRole('button', { name: 'Подробнее о позиции 1' }));
     const form = screen.getByRole('form', { name: 'Позиция' });
-    for (const label of [/^Название от заказчика/, /^Тех\. параметры/, /^Название в документах/, /^Название у поставщика/, /^Кол-во/, /^Цена в валюте/, /^HS-код/, /^Пошлина/, /^Упаковка/, /^Размер упаковки/, /^CBM/, /^Вес/, /^Мест/, /^Коэффициент AD/, /^Комментарий/]) {
+    for (const label of [/^Название от заказчика/, /^Тех\. параметры/, /^Название в документах/, /^Название у поставщика/, /^Кол-во/, /^Цена в валюте/, /^HS-код/, /^Пошлина/, /^Упаковка/, /^Размер упаковки/, /^CBM/, /^Вес/, /^Мест/, /^Расчётный коэффициент себестоимости доставки/, /^Комментарий/]) {
       expect(within(form).getByLabelText(label)).toBeTruthy();
     }
     expect(within(form).getByLabelText('В работу')).toBeTruthy();
     expect(within(form).queryByLabelText('Закупка')).toBeNull();
     fireEvent.click(within(form).getByRole('button', { name: 'как у поставщика' }));
-    expect((within(form).getByLabelText(/^Коэффициент AD/) as HTMLInputElement).value).toBe('');
+    expect((within(form).getByLabelText(/^Расчётный коэффициент себестоимости доставки/) as HTMLInputElement).value).toBe('');
     fireEvent.click(within(form).getByRole('button', { name: 'Сохранить позицию' }));
     await waitFor(async () => expect((await store.load()).lines.find((l) => l.id === 'ln1')?.coef).toBeUndefined());
   });
@@ -299,7 +307,7 @@ describe('медленная запись (как в Sheets)', () => {
     const store = gatedStore(adSeed());
     renderWithStore('/orders/o12', store);
     await screen.findByText('Задвижка');
-    const ad = () => within(block('12-1')).getByLabelText(/^AD поставщика/) as HTMLInputElement;
+    const ad = () => within(block('12-1')).getByLabelText(AD_FIELD) as HTMLInputElement;
     set(ad(), '1');
     await waitFor(() => expect(store.pending).toBe(1));   // идёт запись промежуточного AD = 1
     set(ad(), '1,');
@@ -416,6 +424,154 @@ describe('таблица товаров на ноутбуке (≈1024 px)', () 
     heads.forEach((th, i) => {
       if (th.classList.contains('lines-col--minor')) expect(cells[i].classList.contains('lines-col--minor')).toBe(true);
       else expect(cells[i].classList.contains('lines-col--minor')).toBe(false);
+    });
+  });
+});
+
+describe('названия коэффициентов (G22)', () => {
+  it('шапка таблицы: «Расч. коэфф.» / «Факт. коэфф.», полное название — в подсказке; буквы AD и AW — только в скобках', async () => {
+    renderAt('/orders/o12', adSeed());
+    const table = await screen.findByRole('table', { name: 'Товары 12-1' });
+    const heads = within(table).getAllByRole('columnheader');
+    const ad = heads.find((th) => th.textContent === 'Расч. коэфф.') as HTMLElement;
+    const aw = heads.find((th) => th.textContent === 'Факт. коэфф.') as HTMLElement;
+    expect(ad.title).toMatch(/^Расчётный коэффициент себестоимости доставки \(AD\)/);
+    expect(aw.title).toMatch(/^Фактический коэффициент себестоимости доставки \(AW\)/);
+    expect(heads.some((th) => th.textContent === 'AD' || th.textContent === 'AW')).toBe(false);
+  });
+
+  it('поле поставщика называется полным именем, прежней подписи «AD поставщика» нет', async () => {
+    renderAt('/orders/o12', adSeed());
+    await screen.findByText('Задвижка');
+    const b = block('12-1');
+    expect(within(b).getByLabelText('Расчётный коэффициент себестоимости доставки (для всех товаров поставщика)')).toBeTruthy();
+    expect(within(b).queryByLabelText(/^AD поставщика/)).toBeNull();
+  });
+
+  it('форма позиции: поле называется «Расчётный коэффициент себестоимости доставки», в подсказке — коэффициент поставщика', async () => {
+    renderAt('/orders/o12', adSeed());
+    await screen.findByText('Задвижка');
+    fireEvent.click(within(block('12-1')).getByRole('button', { name: 'Подробнее о позиции 3' }));
+    const form = screen.getByRole('form', { name: 'Позиция' });
+    expect(within(form).getByLabelText(/^Расчётный коэффициент себестоимости доставки/)).toBeTruthy();
+    expect(within(form).getByText(/пусто — как у поставщика \(1,4\)/)).toBeTruthy();
+  });
+});
+
+describe('расчётный коэффициент прямо в таблице (G23)', () => {
+  const lineCoef = async (store: { load: () => Promise<Dataset> }, id: string) => (await store.load()).lines.find((l) => l.id === id)?.coef;
+
+  it('Enter сохраняет своё значение позиции и пересчитывает прогноз; значение выделено', async () => {
+    const { store } = renderAt('/orders/o12', adSeed());
+    await screen.findByText('Задвижка');
+    const row = () => screen.getByTestId('line-ln3');
+    expect(adInput(row()).value).toBe('');
+    set(adInput(row()), '2,5');
+    expect(await lineCoef(store, 'ln3')).toBeUndefined();          // пока не нажат Enter — не сохранено
+    fireEvent.keyDown(adInput(row()), { key: 'Enter' });
+    await waitFor(async () => expect(await lineCoef(store, 'ln3')).toBe(2.5));
+    await waitFor(() => expect(cell(row(), 'AB')).toBe('500,00'));   // 200 ₽ × 2,5
+    expect(adInput(row()).value).toBe('2,5');
+    expect(adInput(row()).classList.contains('ad-own')).toBe(true);
+    // итоги поставщика пересчитаны: ln1 75 000 + ln3 10 × 500
+    expect(termOf(block('12-1'), 'Итого прогноз ₽')).toBe('80000,00₽');
+  });
+
+  it('уход с поля тоже сохраняет; значение, равное сохранённому, повторно не пишется', async () => {
+    const store = gatedStore(adSeed());
+    store.gated = false;
+    renderWithStore('/orders/o12', store);
+    await screen.findByText('Задвижка');
+    const input = () => adInput(screen.getByTestId('line-ln3'));
+    set(input(), '1,9');
+    fireEvent.blur(input());
+    await waitFor(async () => expect(await lineCoef(store, 'ln3')).toBe(1.9));
+    store.gated = true;
+    fireEvent.keyDown(input(), { key: 'Enter' });
+    fireEvent.blur(input());
+    expect(store.pending).toBe(0);
+  });
+
+  it('неверное значение — ошибка в ячейке, не сохраняется; ноль и отрицательное тоже', async () => {
+    const { store } = renderAt('/orders/o12', adSeed());
+    await screen.findByText('Задвижка');
+    const row = () => screen.getByTestId('line-ln3');
+    set(adInput(row()), 'abc');
+    fireEvent.keyDown(adInput(row()), { key: 'Enter' });
+    expect(within(row()).getByText('Введите число')).toBeTruthy();
+    expect(adInput(row()).getAttribute('aria-invalid')).toBe('true');
+    set(adInput(row()), '0');
+    fireEvent.keyDown(adInput(row()), { key: 'Enter' });
+    expect(within(row()).getByText('Больше нуля')).toBeTruthy();
+    set(adInput(row()), '-1');
+    fireEvent.blur(adInput(row()));
+    expect(within(row()).getByText('Больше нуля')).toBeTruthy();
+    expect(adInput(row()).value).toBe('-1');
+    expect(await lineCoef(store, 'ln3')).toBeUndefined();
+    set(adInput(row()), '1,8');
+    fireEvent.keyDown(adInput(row()), { key: 'Enter' });
+    await waitFor(async () => expect(await lineCoef(store, 'ln3')).toBe(1.8));
+    expect(within(row()).queryByText('Больше нуля')).toBeNull();
+  });
+
+  it('пустое значение снимает своё: позиция снова берёт коэффициент поставщика', async () => {
+    const { store } = renderAt('/orders/o12', adSeed());
+    await screen.findByText('Задвижка');
+    const row = () => screen.getByTestId('line-ln1');
+    expect(adInput(row()).value).toBe('1,5');
+    set(adInput(row()), '');
+    fireEvent.keyDown(adInput(row()), { key: 'Enter' });
+    await waitFor(async () => expect(await lineCoef(store, 'ln1')).toBeUndefined());
+    await waitFor(() => expect(cell(row(), 'AB')).toBe('70,00'));      // 50 ₽ × 1,4
+    expect(adInput(row()).placeholder).toBe('1,4');
+    expect(adInput(row()).classList.contains('ad-own')).toBe(false);
+    expect((await store.load()).lines.find((l) => l.id === 'ln1')?.customerName).toBe('Кран DN50');
+  });
+
+  it('кнопка «×» возвращает «как у поставщика»; у позиции без своего значения её нет', async () => {
+    const { store } = renderAt('/orders/o12', adSeed());
+    await screen.findByText('Задвижка');
+    expect(within(screen.getByTestId('line-ln3')).queryByRole('button', { name: /как у поставщика/ })).toBeNull();
+    fireEvent.click(within(screen.getByTestId('line-ln1')).getByRole('button', { name: 'Расчётный коэффициент позиции 1: как у поставщика' }));
+    await waitFor(async () => expect(await lineCoef(store, 'ln1')).toBeUndefined());
+    expect(adInput(screen.getByTestId('line-ln1')).value).toBe('');
+  });
+
+  it('медленная запись: текст в ячейке не откатывается, записывается последнее подтверждённое значение', async () => {
+    const store = gatedStore(adSeed());
+    renderWithStore('/orders/o12', store);
+    await screen.findByText('Задвижка');
+    const input = () => adInput(screen.getByTestId('line-ln3'));
+    set(input(), '2');
+    fireEvent.keyDown(input(), { key: 'Enter' });
+    await waitFor(() => expect(store.pending).toBe(1));
+    set(input(), '2,2');
+    fireEvent.keyDown(input(), { key: 'Enter' });
+    store.release();                                   // запись «2» завершилась
+    await waitFor(async () => expect(await lineCoef(store, 'ln3')).toBe(2));
+    await waitFor(() => expect(store.pending).toBe(1));
+    expect(input().value).toBe('2,2');
+    set(input(), '2,25');                               // набирает дальше, ещё не подтвердил
+    store.gated = false;
+    store.release();
+    await waitFor(async () => expect(await lineCoef(store, 'ln3')).toBe(2.2));
+    await waitFor(() => expect(cell(screen.getByTestId('line-ln3'), 'AB')).toBe('440,00'));
+    expect(input().value).toBe('2,25');
+  });
+
+  it('очередь общая с флажком «В работу»: запись коэффициента не стирает отметку и наоборот', async () => {
+    const store = gatedStore(adSeed());
+    renderWithStore('/orders/o12', store);
+    await screen.findByText('Задвижка');
+    const input = () => adInput(screen.getByTestId('line-ln2'));
+    set(input(), '1,7');
+    fireEvent.keyDown(input(), { key: 'Enter' });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'В работу: позиция 12-1-2' }));
+    store.gated = false;
+    store.release();
+    await waitFor(async () => {
+      const ln2 = (await store.load()).lines.find((l) => l.id === 'ln2');
+      expect(ln2).toMatchObject({ coef: 1.7, purchased: true });
     });
   });
 });

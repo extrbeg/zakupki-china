@@ -6,12 +6,13 @@ import { Link } from 'react-router-dom';
 import { EmptyState, ErrorBanner, TextField } from '../../components';
 import { COST_CATEGORIES, COST_CATEGORY_LABEL } from '../../../domain/costing';
 import { useData } from '../../DataContext';
+import { AD_LABEL, AD_SHORT, AW_SHORT, adTip, awTip } from '../orders/coefLabels';
 import { EMPTY, formatMoney as money, formatPct, formatQty } from '../../format';
 import { buildReportRows, buildRows, lineTitle, selectionTotals, selectionWarnings, type CostingRow } from './costingLogic';
 import './costing.css';
 
 
-/** Меньше AD — лучше прогноза (зелёный), больше — хуже (красный). Разница меньше 0,05 % — без цвета. */
+/** Меньше расчётного коэффициента — лучше прогноза (зелёный), больше — хуже (красный). Разница меньше 0,05 % — без цвета. */
 function devClass(pct: number): string {
   if (Math.abs(pct) < 0.05) return 'costing-dev';
   return `costing-dev ${pct < 0 ? 'costing-dev--good' : 'costing-dev--bad'}`;
@@ -141,7 +142,7 @@ export default function CostingScreen() {
           <dl className="costing-totals" data-testid="totals">
             <div><dt>Позиций в работе</dt><dd>{totals.lines}</dd></div>
             <div><dt>Себестоимость выбора, ₽</dt><dd>{money(totals.total)}</dd></div>
-            <div><dt>Прогноз по AD, ₽</dt><dd>{money(totals.forecastRub)}</dd></div>
+            <div><dt title={`${AD_LABEL} (AD)`}>Прогноз по расчётному коэффициенту себестоимости доставки, ₽</dt><dd>{money(totals.forecastRub)}</dd></div>
             {COST_CATEGORIES.filter((k) => totals.breakdown[k] !== 0).map((k) => (
               <div key={k}><dt>{COST_CATEGORY_LABEL[k]}, ₽</dt><dd>{money(totals.breakdown[k])}</dd></div>
             ))}
@@ -168,9 +169,9 @@ export default function CostingScreen() {
                     <th scope="col" aria-label="Раскрыть" />
                     <th scope="col">Заказ</th><th scope="col">Поставщик</th><th scope="col">Позиция</th>
                     <th scope="col" className="costing-num">Кол-во</th><th scope="col" className="costing-num">Цена</th>
-                    <th scope="col" className="costing-num">Y, ₽</th><th scope="col" className="costing-num">AB</th><th scope="col" className="costing-num">AD</th>
+                    <th scope="col" className="costing-num">Y, ₽</th><th scope="col" className="costing-num">AB</th><th scope="col" className="costing-num costing-coef" title={adTip('прогноз цены в РФ = цена в ₽ × этот коэффициент')}>{AD_SHORT}</th>
                     <th scope="col" className="costing-num">Себестоимость, ₽</th><th scope="col" className="costing-num">AV, ₽/шт</th>
-                    <th scope="col" className="costing-num">AW</th><th scope="col" className="costing-num">Отклонение</th>
+                    <th scope="col" className="costing-num costing-coef" title={awTip('себестоимость за единицу / цена в ₽ за единицу')}>{AW_SHORT}</th><th scope="col" className="costing-num">Отклонение</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -12,3 +12,4 @@
 .tag--fact { border-color: var(--c-primary); color: var(--c-primary); }
 .ui-card .rate-note { margin: 4px 0; }
 .ui-card .btn--small + .btn--small { margin-left: 6px; }
+.rate-confirm { margin: 0; padding-left: 18px; }

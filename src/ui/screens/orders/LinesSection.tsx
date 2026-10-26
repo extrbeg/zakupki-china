@@ -3,15 +3,14 @@
 // «Подробнее» — полная форма позиции прямо под строкой, «Вставить из Excel» — пачкой.
 // Ширина: второстепенные колонки (класс lines-col--minor) скрываются на ноутбуке (orders.css), чтобы таблица не уезжала вбок.
 
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { Line, Order, SupplierOrder } from '../../../domain/model';
 import type { RatePick } from '../../../domain/rates';
-import { useData } from '../../DataContext';
-import { ErrorBanner } from '../../components';
+import { parseUserNumber } from '../../components';
 import { EMPTY, formatCoef, formatMoney, formatNumber, formatPct, formatQty } from '../../format';
+import { AD_SHORT, AW_SHORT, adTip, awTip } from './coefLabels';
 import { LineForm } from './LineForm';
 import type { LineRow } from './linesLogic';
-import { compact } from './orderLogic';
 import { PastePanel } from './PastePanel';
 import { QuickLineEntry } from './QuickLineEntry';
 import { usePurchased } from './purchasedQueue';
@@ -26,13 +25,13 @@ const COLUMNS: { key: string; title: string; tip?: string; num?: boolean; minor?
   { key: 'X', title: 'Сумма, {cur}', tip: 'X = кол-во × цена', num: true },
   { key: 'Y', title: 'Цена ₽/шт', tip: 'Y = цена × курс даты расчёта', num: true },
   { key: 'Z', title: 'Сумма ₽', tip: 'Z = Y × кол-во', num: true, minor: true },
-  { key: 'AD', title: 'AD', tip: 'Коэффициент прогноза: свой у позиции (выделен) или AD поставщика', num: true },
-  { key: 'AB', title: 'Прогноз ₽/шт (AB)', tip: 'AB = Y × AD — прогноз цены в РФ за единицу', num: true },
+  { key: 'AD', title: AD_SHORT, tip: adTip('вводится прямо в ячейке; пусто — как у поставщика (показан бледно), своё значение выделено'), num: true },
+  { key: 'AB', title: 'Прогноз ₽/шт (AB)', tip: 'AB = Y × расчётный коэффициент — прогноз цены в РФ за единицу', num: true },
   { key: 'ABqty', title: 'Прогноз ₽ на кол-во', tip: 'AB × кол-во', num: true, minor: true },
   { key: 'AV', title: 'Себест. ₽/шт (AV)', tip: 'AV = себестоимость позиции / кол-во', num: true },
   { key: 'AVqty', title: 'Себест. ₽ на кол-во', tip: 'AV × кол-во', num: true, minor: true },
-  { key: 'AW', title: 'AW', tip: 'AW = AV / Y — фактический коэффициент', num: true },
-  { key: 'dev', title: 'Откл.', tip: 'Отклонение AW от AD: зелёный — фактически дешевле прогноза', num: true },
+  { key: 'AW', title: AW_SHORT, tip: awTip('= себестоимость за единицу / цена в ₽ за единицу'), num: true },
+  { key: 'dev', title: 'Откл.', tip: 'Отклонение факт. коэффициента от расчётного: зелёный — фактически дешевле прогноза', num: true },
 ];
 /** Все колонки: «В работу» + данные + «Действия». */
 export const LINE_COLUMN_COUNT = COLUMNS.length + 2;
@@ -44,22 +43,10 @@ const colClass = (key: string, extra?: string) =>
 export function LinesSection({ order, so, code, rate, rows }: {
   order: Order; so: SupplierOrder; code: string; rate: RatePick | null; rows: LineRow[];
 }) {
-  const data = useData();
   const { toggle } = usePurchased();
   const [editing, setEditing] = useState<string | null>(null);
   const [pasting, setPasting] = useState<string | null>(null);
-  const [rowError, setRowError] = useState<unknown>(undefined);
   const nextSeq = rows.reduce((m, r) => Math.max(m, r.line.seq), 0) + 1;
-
-  const resetAd = async (l: Line) => {
-    setRowError(undefined);
-    try {
-      const current = data.ds.lines.find((x) => x.id === l.id) ?? l;
-      await data.save('lines', compact({ ...current, coef: undefined }) as Line);
-    } catch (e) {
-      setRowError(e);
-    }
-  };
 
   const row = (r: LineRow) => {
     const l = r.line;
@@ -84,16 +71,8 @@ export function LinesSection({ order, so, code, rate, rows }: {
           <td data-col="X" className="num">{formatMoney(r.X)}</td>
           <td data-col="Y" className={colClass('Y')}>{formatMoney(r.Y)}</td>
           <td data-col="Z" className={colClass('Z')}>{formatMoney(r.Z)}</td>
-          <td className="num">
-            {r.ownAD ? (
-              <>
-                <span data-col="AD"><span className="ad-own" title="Свой AD позиции">{formatCoef(r.AD)}</span></span>
-                <button
-                  type="button" className="btn--link ad-reset" aria-label={`AD позиции ${l.seq} как у поставщика`}
-                  title="Снять свой AD — как у поставщика" onClick={() => void resetAd(l)}
-                >×</button>
-              </>
-            ) : <span data-col="AD">{formatCoef(r.AD)}</span>}
+          <td data-col="AD" className="num cell--coef">
+            <CoefCell line={l} so={so} />
           </td>
           <td data-col="AB" className={colClass('AB')}>{formatMoney(r.AB)}</td>
           <td data-col="ABqty" className={colClass('ABqty')}>{formatMoney(r.ABqty)}</td>
@@ -131,7 +110,6 @@ export function LinesSection({ order, so, code, rate, rows }: {
   return (
     <div className="so-lines">
       {!rate ? <div className="banner banner--warning">Нет курса на дату расчёта — цены в ₽ и прогноз не посчитаны. Введите курс вручную в реквизитах поставщика или добавьте его на экране «Курсы».</div> : null}
-      {rowError !== undefined ? <ErrorBanner error={rowError} /> : null}
       <div className="table-scroll">
         <table className="table lines-table" aria-label={`Товары ${code}`}>
           <thead>
@@ -162,5 +140,75 @@ export function LinesSection({ order, so, code, rate, rows }: {
         <PastePanel key="paste" order={order} so={so} nextSeq={nextSeq} initialText={pasting} onClose={() => setPasting(null)} />
       )}
     </div>
+  );
+}
+
+/** Ячейка «Расч. коэфф.» (G23): поле ввода прямо в строке. Пусто — действует коэффициент поставщика (он же бледная подсказка),
+ *  своё значение выделено. Enter или уход с поля сохраняет (через общую очередь записей); неверное — ошибка, не сохраняется;
+ *  «×» возвращает «как у поставщика». Текст поля держит сама ячейка: ответ на промежуточную запись его не откатывает. */
+function CoefCell({ line, so }: { line: Line; so: SupplierOrder }) {
+  const { setCoef } = usePurchased();
+  const show = (v: number | undefined) => (v === undefined ? '' : String(v).replace('.', ','));
+  const [text, setText] = useState(show(line.coef));
+  const [error, setError] = useState<string | undefined>(undefined);
+  const busy = useRef(0);          // записей этой ячейки в очереди
+  const dirty = useRef(false);     // текст правят и ещё не подтвердили
+  const committed = useRef<number | undefined>(line.coef);
+
+  // Значение сменили не отсюда (перезагрузка данных, форма позиции) — показать его, если своих записей и правки нет.
+  useEffect(() => {
+    if (busy.current > 0 || dirty.current) return;
+    committed.current = line.coef;
+    setText(show(line.coef));
+    setError(undefined);
+  }, [line.coef]);
+
+  const write = (value: number | undefined) => {
+    committed.current = value;
+    busy.current += 1;
+    void setCoef(line.id, value).finally(() => { busy.current -= 1; });
+  };
+
+  const commit = () => {
+    const n = parseUserNumber(text);
+    if (n === null) { setError('Введите число'); return; }
+    if (n !== undefined && n <= 0) { setError('Больше нуля'); return; }
+    setError(undefined);
+    dirty.current = false;
+    setText(show(n));
+    if (Object.is(n, committed.current)) return;
+    write(n);
+  };
+
+  const reset = () => {
+    setError(undefined);
+    dirty.current = false;
+    setText('');
+    if (committed.current !== undefined) write(undefined);
+  };
+
+  const errId = `coef-error-${line.id}`;
+  return (
+    <>
+      <span className="coef-cell">
+        <input
+          className={`input input--cell input--number coef-input${text !== '' ? ' ad-own' : ''}`} type="text" inputMode="decimal"
+          aria-label={`Расчётный коэффициент позиции ${line.seq}`}
+          title={text === '' ? `Как у поставщика (${formatCoef(so.coef)}); впишите своё значение` : 'Свой коэффициент позиции'}
+          placeholder={formatCoef(so.coef)} value={text}
+          aria-invalid={error ? true : undefined} aria-describedby={error ? errId : undefined}
+          onChange={(e) => { dirty.current = true; setText(e.target.value); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } }}
+          onBlur={commit}
+        />
+        {text !== '' ? (
+          <button
+            type="button" className="btn--link ad-reset" aria-label={`Расчётный коэффициент позиции ${line.seq}: как у поставщика`}
+            title="Вернуть «как у поставщика»" onMouseDown={(e) => e.preventDefault()} onClick={reset}
+          >×</button>
+        ) : null}
+      </span>
+      {error ? <div className="field__error coef-error" id={errId} role="alert">{error}</div> : null}
+    </>
   );
 }

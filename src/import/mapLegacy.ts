@@ -6,6 +6,7 @@ import { sheetFor } from '../store/schema';
 import { newId } from '../domain/ids';
 import { bool, columnOf, date, findHeaderRow, hasAny, isBlank, looksLikeDateSerial, nameKey, norm, num, ruDate, text } from './cells';
 import type { ImportData, ImportPlan, ImportProblem, LegacyRaw } from './types';
+import { CHINA_COUNTRY_ID, chinaProvinceOf } from '../data/geo';
 
 type Row = unknown[];
 
@@ -465,7 +466,8 @@ function mapLists(ctx: Ctx) {
       if (name) { const c = cityOf(name); if (c.population === undefined && pop !== undefined) c.population = Math.round(pop); }
     }
   }
-  ctx.data.cities = [...cities.values()];
+  // G20: город без провинции получает её из справочника Китая (если город там однозначен); страна — Китай.
+  ctx.data.cities = [...cities.values()].map((c) => ({ ...c, province: c.province || chinaProvinceOf(c.city) || '', countryId: CHINA_COUNTRY_ID }));
 
   // Курсы ВТБ: «Дата», «Валюта», «Курс ВТБ» — переносятся как ручные.
   const rateCol = columnOf(head, 'Курс ВТБ', 'Курс');

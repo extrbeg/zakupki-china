@@ -1,17 +1,23 @@
-// Полная форма позиции («Подробнее» у строки): все поля истории 11, свой AD с подсказкой и «как у поставщика», живой прогноз AB
-// по действующему AD; ошибки у полей, введённое не теряется.
+// Полная форма позиции («Подробнее» у строки): все поля истории 11, свой расчётный коэффициент (AD) с подсказкой и «как у поставщика», живой прогноз AB
+// по действующему коэффициенту; ошибки у полей, введённое не теряется.
+// «Название от заказчика» подсказывается из прошлых позиций (история 93): выбор подставляет в пустые поля HS-код, пошлину, упаковку,
+// название у поставщика, вес и CBM на единицу × кол-во; вес и CBM, подставленные так, пересчитываются при смене кол-ва, пока их не правили.
+// Как и в строке быстрого ввода, то же делает точно набранное название прошлого товара; ручная правка названия снимает пересчёт по прежнему товару.
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { suggestCoef } from '../../../domain/costing';
 import { newId } from '../../../domain/ids';
 import { lineFigures } from '../../../domain/lineFigures';
+import { exactProductHint, productFill, type ProductHint } from '../../../domain/productHints';
 import type { Line, Order, SupplierOrder } from '../../../domain/model';
 import type { RatePick } from '../../../domain/rates';
 import { validateLine } from '../../../domain/validation';
 import { useData } from '../../DataContext';
-import { CheckboxField, ConfirmDelete, ErrorBanner, FormGrid, NumberField, TextField, isBadNumber } from '../../components';
+import { CheckboxField, ConfirmDelete, ErrorBanner, Field, FormGrid, NumberField, TextField, isBadNumber } from '../../components';
 import { formatCoef, formatMoney } from '../../format';
+import { AD_LABEL } from './coefLabels';
 import { compact, lineDeleteBlock, suggestionBasis, suggestionText } from './orderLogic';
+import { ProductNameInput, fillNote, useProductHints } from './ProductNameInput';
 
 type NumKey = 'qty' | 'unitPrice' | 'dutyRate' | 'cbm' | 'weight' | 'places' | 'coef';
 const NUM_KEYS: NumKey[] = ['qty', 'unitPrice', 'dutyRate', 'cbm', 'weight', 'places', 'coef'];
@@ -48,9 +54,39 @@ export function LineForm({ order, so, line, nextSeq, rate, onClose }: {
   const [saveError, setSaveError] = useState<unknown>(undefined);
   const [busy, setBusy] = useState(false);
 
+  const hints = useProductHints(line?.id);
+  /** Подсказка, из которой подставлены вес и CBM, и какие из них ещё не правили руками — их пересчитывает смена кол-ва. */
+  const auto = useRef<{ hint: ProductHint; keys: Set<'weight' | 'cbm'> } | null>(null);
+
+  const setNum = (key: NumKey, v: number | undefined) => setDraft((d) => {
+    const nums = { ...d.nums, [key]: v };
+    if (key === 'weight' || key === 'cbm') auto.current?.keys.delete(key);
+    if (key === 'qty' && auto.current) {
+      const fill = productFill(auto.current.hint, typeof v === 'number' && !Number.isNaN(v) ? v : undefined);
+      for (const k of auto.current.keys) nums[k] = fill[k];
+    }
+    return { ...d, nums };
+  });
   const num = (key: NumKey, label: string, extra?: { hint?: string }) => (
-    <NumberField label={label} value={draft.nums[key]} error={errors[key]} hint={extra?.hint} onChange={(v) => setDraft((d) => ({ ...d, nums: { ...d.nums, [key]: v } }))} />
+    <NumberField label={label} value={draft.nums[key]} error={errors[key]} hint={extra?.hint} onChange={(v) => setNum(key, v)} />
   );
+
+  /** Выбор товара из подсказки (или точно набранное название — `typed`): подставляет только пустые поля. */
+  const pickHint = (hint: ProductHint, typed?: string) => setDraft((d) => {
+    const qty = typeof d.nums.qty === 'number' && !Number.isNaN(d.nums.qty) ? d.nums.qty : undefined;
+    const fill = productFill(hint, qty);
+    const texts = { ...d.texts, customerName: typed ?? hint.name };
+    for (const k of ['hsCode', 'packaging', 'packageSize', 'supplierName'] as const) {
+      if (!texts[k].trim() && fill[k] !== undefined) texts[k] = fill[k] as string;
+    }
+    const nums = { ...d.nums };
+    if (nums.dutyRate === undefined && fill.dutyRate !== undefined) nums.dutyRate = fill.dutyRate;
+    const keys = new Set<'weight' | 'cbm'>();
+    if (nums.weight === undefined && hint.weightPerUnit !== undefined) { keys.add('weight'); nums.weight = fill.weight; }
+    if (nums.cbm === undefined && hint.cbmPerUnit !== undefined) { keys.add('cbm'); nums.cbm = fill.cbm; }
+    auto.current = keys.size ? { hint, keys } : null;
+    return { ...d, texts, nums };
+  });
   const text = (key: TextKey, label: string, multiline = false) => (
     <TextField label={label} multiline={multiline} value={draft.texts[key]} onChange={(v) => setDraft((d) => ({ ...d, texts: { ...d.texts, [key]: v } }))} />
   );
@@ -95,7 +131,20 @@ export function LineForm({ order, so, line, nextSeq, rate, onClose }: {
       <h4 style={{ margin: '0 0 8px' }}>{line ? `Позиция ${order.number}-${so.seq}-${line.seq}` : 'Новая позиция'}</h4>
       {saveError !== undefined ? <ErrorBanner error={saveError} /> : null}
       <FormGrid>
-        {text('customerName', 'Название от заказчика')}
+        <Field label="Название от заказчика" hint={fillNote(exactProductHint(hints, draft.texts.customerName)) || 'Начните вводить — подскажем товар из прошлых позиций'}>
+          {({ id, describedBy }) => (
+            <ProductNameInput
+              id={id} aria-describedby={describedBy} hints={hints} value={draft.texts.customerName}
+              onChange={(v) => {
+                auto.current = null;   // название правят руками — вес и CBM больше не пересчитываются по прежнему товару
+                const exact = exactProductHint(hints, v);
+                if (exact) pickHint(exact, v);
+                else setDraft((d) => ({ ...d, texts: { ...d.texts, customerName: v } }));
+              }}
+              onPickHint={pickHint}
+            />
+          )}
+        </Field>
         {text('techParams', 'Тех. параметры', true)}
         {text('docName', 'Название в документах')}
         {text('supplierName', 'Название у поставщика (EN)')}
@@ -112,8 +161,8 @@ export function LineForm({ order, so, line, nextSeq, rate, onClose }: {
         {num('weight', 'Вес, кг')}
         {num('places', 'Мест')}
         <div>
-          {num('coef', 'Коэффициент AD', {
-            hint: so.coef === undefined ? 'свой AD позиции; у поставщика AD не задан' : `свой AD позиции; пусто — как у поставщика (${formatCoef(so.coef)})`,
+          {num('coef', AD_LABEL, {
+            hint: so.coef === undefined ? 'свой у позиции; у поставщика не задан' : `свой у позиции; пусто — как у поставщика (${formatCoef(so.coef)})`,
           })}
           <div className="coef-hint muted">
             {draft.nums.coef !== undefined ? (
@@ -125,7 +174,7 @@ export function LineForm({ order, so, line, nextSeq, rate, onClose }: {
               suggestionText(suggestion)
             ) : (
               <button
-                type="button" className="btn btn--small" title={`Медиана AW закрытых позиций ${basis}`}
+                type="button" className="btn btn--small" title={`Медиана фактических коэффициентов (AW) закрытых позиций ${basis}`}
                 onClick={() => setDraft((d) => ({ ...d, nums: { ...d.nums, coef: suggestion.value ?? undefined } }))}
               >
                 {suggestionText(suggestion)}

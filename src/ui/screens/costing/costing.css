@@ -31,3 +31,4 @@
 @media (max-width: 600px) {
   .costing-picker__list { grid-template-columns: 1fr; }
 }
+.costing-table th.costing-coef { white-space: normal; min-width: 4.5rem; }

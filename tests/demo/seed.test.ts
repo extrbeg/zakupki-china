@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createDemoStore, demoSeed, DEMO_STORAGE_KEY } from '../../src/demo';
 import { ENTITY_NAMES } from '../../src/domain/model';
+import { CHINA_COUNTRY_ID, GEO_VERSION } from '../../src/data/geo';
 
 describe('демо-набор', () => {
   it('2–3 заказа, поставщики, курсы трёх валют', () => {
@@ -43,6 +44,19 @@ describe('демо-набор', () => {
     expect(overrides).toHaveLength(1);
     const so = ds.supplierOrders!.find((s) => s.id === overrides[0].supplierOrderId)!;
     expect(overrides[0].coef).not.toBe(so.coef);
+  });
+
+  it('G20/G21: справочник Китая — страна, 33 провинции, города; города и страны поставщиков и агентов есть в справочнике', () => {
+    const ds = demoSeed();
+    expect(ds.countries).toEqual([{ id: CHINA_COUNTRY_ID, name: 'Китай' }]);
+    expect(ds.provinces).toHaveLength(33);
+    expect(ds.cities!.length).toBeGreaterThan(800);
+    expect(ds.cities!.every((c) => c.countryId === CHINA_COUNTRY_ID)).toBe(true);
+    for (const p of [...ds.suppliers!, ...ds.agents!]) {
+      expect(p.country).toBe('Китай');
+      expect(ds.cities!.some((c) => c.city === p.city && c.province === p.province)).toBe(true);
+    }
+    expect((ds.meta ?? {}).geoVersion).toBe(GEO_VERSION);
   });
 
   it('createDemoStore сидит данные один раз и хранит их в localStorage', async () => {

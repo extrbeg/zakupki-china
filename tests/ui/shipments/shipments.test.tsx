@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { baseSeed, renderAt, rubCost, shipment, squash } from './helpers';
+import { pickSuggestion } from '../components/suggest';
 
 const typeInto = (label: RegExp | string | HTMLElement, value: string) =>
   fireEvent.change(typeof label === 'object' && !(label instanceof RegExp) ? label : screen.getByLabelText(label), { target: { value } });
@@ -13,7 +14,7 @@ describe('список и создание поставки', () => {
     expect((screen.getByLabelText(/^НДС, %/) as HTMLInputElement).value).toBe('20');
     typeInto(/^Номер поставки/, 'К-1');
     typeInto('Тип поставки', 'air');
-    typeInto('Перевозчик', 'k1');
+    pickSuggestion(screen.getByLabelText('Перевозчик'), 'Море-Транс');
     typeInto('Отправка в РФ', '2026-11-01');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить поставку' }));
     await waitFor(async () => expect((await store.load()).shipments).toHaveLength(1));

@@ -10,16 +10,19 @@ import CostsScreen from '../../../src/ui/screens/costs/CostsScreen';
 import { baseSeed, gatedStore, renderAt, renderWithStore } from '../orders/helpers';
 import { renderAt as renderShipments, baseSeed as shipSeed } from '../shipments/helpers';
 import { renderAt as renderDirs, baseSeed as dirSeed } from '../directories/helpers';
+import { pickSuggestion, pickedValue } from './suggest';
 
 const set = (el: HTMLElement, value: string) => fireEvent.change(el, { target: { value } });
 const value = (el: HTMLElement) => (el as HTMLInputElement).value;
 const header = () => screen.getByRole('region', { name: 'Шапка заказа' });
-/** Выбирает в списке пункт по видимому тексту (например «+ Добавить…»). */
+/** Выбирает пункт по видимому тексту (например «+ Добавить…»): в выпадающем списке или в подсказках поля с поиском. */
 const choose = (select: HTMLElement, text: string) => {
+  if (select.tagName !== 'SELECT') { pickSuggestion(select, text); return; }
   const opt = within(select).getByRole('option', { name: text }) as HTMLOptionElement;
   set(select, opt.value);
 };
 const selectedText = (select: HTMLElement) => {
+  if (select.tagName !== 'SELECT') return (select as HTMLInputElement).value;
   const s = select as HTMLSelectElement;
   return s.options[s.selectedIndex]?.textContent ?? '';
 };
@@ -133,12 +136,13 @@ describe('«+ Новый поставщик…» в реквизитах пос�
     await waitFor(async () => expect((await store.load()).suppliers.map((s) => s.name)).toContain('Gamma Pumps'));
     const created = (await store.load()).suppliers.find((s) => s.name === 'Gamma Pumps')!;
     expect(created.id).toMatch(/^sup_/);
-    expect(value(sup)).toBe(created.id);
+    expect(pickedValue(sup)).toBe(created.id);
 
     choose(sup, '+ Новый поставщик…');
     set(form.getByLabelText(/^Название нового поставщика/), ' gamma pumps ');
     enter(form.getByLabelText(/^Название нового поставщика/));
-    expect(value(sup)).toBe(created.id);
+    expect(pickedValue(sup)).toBe(created.id);
+    expect(selectedText(sup)).toBe('Gamma Pumps');
 
     const terms = form.getByLabelText(/^Условия оплаты/);
     choose(terms, '+ Добавить…');
@@ -187,7 +191,7 @@ describe('другие формы', () => {
     choose(carrier, '+ Новый перевозчик…');
     set(screen.getByLabelText(/^Название нового перевозчика/), 'море-транс');
     enter(screen.getByLabelText(/^Название нового перевозчика/));
-    expect(value(carrier)).toBe('k1');
+    expect(pickedValue(carrier)).toBe('k1');
     expect((await store.load()).carriers).toHaveLength(2);
   });
 

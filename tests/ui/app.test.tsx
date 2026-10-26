@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { App } from '../../src/ui/App';
 
-const MENU = ['Заказы', 'Поставки', 'Затраты', 'Себестоимость', 'Курсы', 'Поставщики', 'Платёжные агенты', 'Перевозчики', 'Списки', 'Настройки', 'Что нового'];
+const MENU = ['Заказы', 'Поставки', 'Затраты', 'Себестоимость', 'Курсы', 'Поставщики', 'Платёжные агенты', 'Перевозчики', 'География', 'Списки', 'Настройки', 'Что нового'];
 
 function openAt(hash: string, demo = true) {
   if (demo) localStorage.setItem('zk:mode', 'demo');
@@ -48,7 +48,7 @@ describe('маршруты interfaces.md §8 ведут на свои экран
   const routes: [string, string][] = [
     ['#/', 'Заказы'], ['#/orders/demo_ord_1', 'Заказ'], ['#/shipments', 'Поставки'], ['#/shipments/demo_sh_1', 'Поставка'],
     ['#/costs', 'Затраты'], ['#/costing', 'Себестоимость'], ['#/rates', 'Курсы'], ['#/suppliers', 'Поставщики'],
-    ['#/suppliers/demo_sup_1', 'Поставщик'], ['#/agents', 'Платёжные агенты'], ['#/carriers', 'Перевозчики'], ['#/lists', 'Списки'],
+    ['#/suppliers/demo_sup_1', 'Поставщик'], ['#/agents', 'Платёжные агенты'], ['#/carriers', 'Перевозчики'], ['#/geography', 'География'], ['#/lists', 'Списки'],
     ['#/settings', 'Настройки'], ['#/import', 'Импорт из старой таблицы'], ['#/connect', 'Подключение таблицы'],
   ];
   for (const [hash, heading] of routes) {

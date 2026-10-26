@@ -7,10 +7,11 @@ import { useData } from '../../DataContext';
 import { EmptyState } from '../../components';
 import { CURRENCY_LABEL, FOREIGN_CURRENCIES, formatRate, ruDate } from '../../format';
 import { RateForm } from './RateForm';
+import { RatesOnDateForm } from './RatesOnDateForm';
 import { autoRatesStale, buildRateRows, type RateCell } from './rateTable';
 import './rates.css';
 
-type Open = { mode: 'new' } | { mode: 'edit'; id: string } | null;
+type Open = { mode: 'multi' } | { mode: 'edit'; id: string } | null;
 
 const PAGE = 60;
 
@@ -47,7 +48,7 @@ export default function RatesScreen() {
   const auto = useMemo(() => autoRatesStale(ds.rates, today), [ds.rates, today]);
   const editing = open?.mode === 'edit' ? ds.rates.find((r) => r.id === open.id) : undefined;
   const close = () => setOpen(null);
-  const addButton = <button type="button" className="btn btn--primary" onClick={() => setOpen({ mode: 'new' })}>Добавить курс</button>;
+  const addButton = <button type="button" className="btn btn--primary" onClick={() => setOpen({ mode: 'multi' })}>Курсы на дату</button>;
 
   return (
     <section className="screen">
@@ -62,14 +63,15 @@ export default function RatesScreen() {
           <span>Автокурсов ВТБ ещё нет — в таблице откройте меню «Закупки» → «Включить ежедневные курсы».</span>
         </div>
       ) : null}
-      {open ? <RateForm key={open.mode === 'edit' ? open.id : 'new'} rate={editing} onClose={close} /> : null}
+      {open?.mode === 'multi' ? <RatesOnDateForm onClose={close} /> : null}
+      {editing ? <RateForm key={editing.id} rate={editing} onClose={close} /> : null}
       {status === 'loading' ? <p className="muted">Загрузка…</p> : null}
       {status !== 'loading' && rows.length === 0 ? (
         open ? null : (
           <EmptyState
             title="Курсов пока нет"
             text="Курсы ВТБ записывает скрипт таблицы каждый день (меню «Закупки» → «Включить ежедневные курсы»). Курс на дату можно ввести и вручную."
-            actions={[{ label: 'Добавить курс', onClick: () => setOpen({ mode: 'new' }) }]}
+            actions={[{ label: 'Курсы на дату', onClick: () => setOpen({ mode: 'multi' }) }]}
           />
         )
       ) : null}

@@ -1,6 +1,7 @@
 // Выбор поставщика, платёжного агента или перевозчика с пунктом «+ Новый…» (история 86).
 // Запись справочника создаётся только с названием и сразу выбирается; остальные поля заполняются потом в справочнике.
 // Дубль по названию (без учёта регистра и пробелов) не создаётся — выбирается существующая запись.
+// Выбор — поле с поиском при вводе по части названия (история 93).
 
 import { useRef, useState } from 'react';
 import { newId } from '../../domain/ids';
@@ -79,7 +80,7 @@ export function DirectorySelectField({ entity, value, onChange, ...rest }: Direc
 
   return (
     <AddableSelect
-      {...rest} value={value} options={options} addError={addError}
+      {...rest} search value={value} options={options} addError={addError}
       addLabel={NEW_DIRECTORY_LABEL[entity]} inputLabel={INPUT_LABEL[entity]}
       onChange={(v) => { setAddError(undefined); onChange(v); }} onAdd={add}
     />

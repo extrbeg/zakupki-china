@@ -30,7 +30,7 @@ describe('история версий', () => {
   it('первая запись — версия из package.json, и сборка показывает её же', () => {
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { version: string };
     expect(CHANGELOG[0].version).toBe(pkg.version);
-    expect(pkg.version).toBe('0.6.1');
+    expect(pkg.version).toBe('0.7.0');
     expect(APP_VERSION).toBe(pkg.version);
   });
 
@@ -38,7 +38,7 @@ describe('история версий', () => {
     const versions = CHANGELOG.map((e) => e.version);
     expect(new Set(versions).size).toBe(versions.length);
     for (let i = 1; i < versions.length; i += 1) expect(compareVersions(versions[i - 1], versions[i])).toBeGreaterThan(0);
-    expect(versions).toEqual(['0.6.1', '0.6.0', '0.5.0', '0.4.0', '0.3.0', '0.2.0', '0.1.0']);
+    expect(versions).toEqual(['0.7.0', '0.6.1', '0.6.0', '0.5.0', '0.4.0', '0.3.0', '0.2.0', '0.1.0']);
     for (const e of CHANGELOG) expect(e.added.length + e.fixed.length).toBeGreaterThan(0);
   });
 

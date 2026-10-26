@@ -81,6 +81,19 @@ describe('экран «Себестоимость»', () => {
     expect(screen.queryByRole('row', { name: /Кабель ВВГ/ })).toBeNull();
   });
 
+  it('названия коэффициентов: «Расч. коэфф.» / «Факт. коэфф.» с полным названием в подсказке; итог «Прогноз по …» — полным названием', async () => {
+    await renderCosting();
+    pick(/№ 12/);
+    const heads = screen.getAllByRole('columnheader');
+    const ad = heads.find((th) => norm(th.textContent) === 'Расч. коэфф.') as HTMLElement;
+    const aw = heads.find((th) => norm(th.textContent) === 'Факт. коэфф.') as HTMLElement;
+    expect(ad.title).toMatch(/^Расчётный коэффициент себестоимости доставки \(AD\)/);
+    expect(aw.title).toMatch(/^Фактический коэффициент себестоимости доставки \(AW\)/);
+    expect(heads.some((th) => ['AD', 'AW'].includes(norm(th.textContent)))).toBe(false);
+    expect(within(screen.getByTestId('totals')).getByText('Прогноз по расчётному коэффициенту себестоимости доставки, ₽')).toBeTruthy();
+    expect(within(screen.getByTestId('totals')).queryByText(/по AD/)).toBeNull();
+  });
+
   it('закрытый заказ: AW без пометки, лучше прогноза — зелёное отклонение', async () => {
     await renderCosting();
     pick(/№ 6/);

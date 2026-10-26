@@ -113,3 +113,4 @@ npm run build      # сборка в dist/
 - Устройство проекта — [docs/architecture.md](docs/architecture.md), решения — [docs/adr/](docs/adr/), словарь — [CONTEXT.md](CONTEXT.md), история версий — [CHANGELOG.md](CHANGELOG.md).
 - Публикация: workflow `.github/workflows/deploy.yml` при push в `main` запускает проверку, собирает приложение с переменными репозитория и публикует его на GitHub Pages.
 - Коммерческие данные в репозиторий не коммитятся: выгрузки реальной таблицы — в `fixtures/private/` (папка в `.gitignore`).
+- Справочник городов Китая — по данным GeoNames (CC BY 4.0), `src/data/geo/china.ts`.

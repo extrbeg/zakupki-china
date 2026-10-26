@@ -1,16 +1,21 @@
 // Строка быстрого ввода внизу таблицы товаров (G06): товар, кол-во, цена; Enter сохраняет позицию — по умолчанию не в работе
 // (запрос цены; «В работу» отмечается во вкладке «Сравнение цен» или в форме) — и возвращает курсор в товар новой пустой строки. Неверный ввод — ошибка у поля, ничего не сохраняется, введённое остаётся.
 // Вставка таблицы (с табуляцией или несколькими строками) в поле товара открывает «Вставить из Excel».
+// Товар подсказывается из прошлых позиций (история 93): выбранный (или введённый точно так же) берёт из последней такой позиции
+// HS-код, пошлину, упаковку, название у поставщика, вес и CBM на единицу × кол-во.
 
 import { useId, useRef, useState, type KeyboardEvent } from 'react';
 import { newId } from '../../../domain/ids';
 import { lineFigures } from '../../../domain/lineFigures';
+import { exactProductHint, productFill, type ProductHint } from '../../../domain/productHints';
+import { searchKey } from '../../../domain/search';
 import type { Line, Order, SupplierOrder } from '../../../domain/model';
 import type { RatePick } from '../../../domain/rates';
 import { validateLine } from '../../../domain/validation';
 import { useData } from '../../DataContext';
 import { ErrorBanner, parseUserNumber } from '../../components';
 import { formatCoef, formatMoney } from '../../format';
+import { ProductNameInput, fillNote, useProductHints } from './ProductNameInput';
 
 type Key = 'name' | 'qty' | 'price';
 
@@ -27,6 +32,11 @@ export function QuickLineEntry({ order, so, nextSeq, rate, onPasteTable }: {
   const [errors, setErrors] = useState<Partial<Record<Key, string>>>({});
   const [saveError, setSaveError] = useState<unknown>(undefined);
   const [busy, setBusy] = useState(false);
+  const hints = useProductHints();
+  /** Выбранная подсказка товара; действует, пока название не поменяли. */
+  const [picked, setPicked] = useState<ProductHint | undefined>(undefined);
+  const hintFor = (name: string) => (picked && searchKey(picked.name) === searchKey(name) ? picked : exactProductHint(hints, name));
+  const hint = hintFor(text.name);
 
   const qty = parseUserNumber(text.qty);
   const price = parseUserNumber(text.price);
@@ -53,6 +63,8 @@ export function QuickLineEntry({ order, so, nextSeq, rate, onPasteTable }: {
         id: newId('ln'), orderId: order.id, supplierOrderId: so.id, seq: nextSeq,
         customerName: name, qty: qty as number, unitPrice: price as number, purchased: false,
       };
+      const from = hintFor(name);
+      if (from) Object.assign(line, productFill(from, qty as number));
       const snapshot = text;
       await data.save('lines', line);
       // Пока шла запись, человек мог начать следующий товар: очищаем только поля, которые не менялись с Enter.
@@ -61,6 +73,8 @@ export function QuickLineEntry({ order, so, nextSeq, rate, onPasteTable }: {
       const next = { name: keep('name'), qty: keep('qty'), price: keep('price') };
       textRef.current = next;
       setText(next);
+      // название сохранено и очищено — выбранная подсказка отслужила; следующая строка ищет данные заново (уже с этой позицией)
+      if (next.name === '') setPicked(undefined);
       if (now.name === snapshot.name && now.qty === snapshot.qty && now.price === snapshot.price) nameRef.current?.focus();
     } catch (e) {
       setSaveError(e);
@@ -76,19 +90,33 @@ export function QuickLineEntry({ order, so, nextSeq, rate, onPasteTable }: {
   const input = (key: Key, label: string, extra: { numeric?: boolean; placeholder: string }) => {
     const err = errors[key];
     const errId = `${id}-${key}-error`;
+    if (key === 'name') {
+      const note = fillNote(hint);
+      return (
+        <>
+          <ProductNameInput
+            inputRef={nameRef} hints={hints} className="input input--cell" aria-label={label} placeholder={extra.placeholder} value={text.name}
+            aria-invalid={err ? true : undefined} aria-describedby={err ? errId : undefined}
+            onChange={(value) => setText((t) => ({ ...t, name: value }))}
+            onPickHint={(h) => { setPicked(h); setText((t) => ({ ...t, name: h.name })); }}
+            onKeyDown={onKeyDown}
+            onPaste={(e) => {
+              const pasted = e.clipboardData.getData('text');
+              if (/[\t\n]/.test(pasted.trim())) { e.preventDefault(); onPasteTable(pasted); }
+            }}
+          />
+          {err ? <div className="field__error" id={errId}>{err}</div> : note ? <div className="suggest__fill">{note}</div> : null}
+        </>
+      );
+    }
     return (
       <>
         <input
-          ref={key === 'name' ? nameRef : undefined}
           className={`input input--cell${extra.numeric ? ' input--number' : ''}`} type="text" inputMode={extra.numeric ? 'decimal' : undefined}
           aria-label={label} placeholder={extra.placeholder} value={text[key]}
           aria-invalid={err ? true : undefined} aria-describedby={err ? errId : undefined}
           onChange={(e) => { const value = e.target.value; setText((t) => ({ ...t, [key]: value })); }}
           onKeyDown={onKeyDown}
-          onPaste={key === 'name' ? (e) => {
-            const pasted = e.clipboardData.getData('text');
-            if (/[\t\n]/.test(pasted.trim())) { e.preventDefault(); onPasteTable(pasted); }
-          } : undefined}
         />
         {err ? <div className="field__error" id={errId}>{err}</div> : null}
       </>

@@ -5,7 +5,8 @@ import { newId } from '../../../domain/ids';
 import type { PaymentAgent } from '../../../domain/model';
 import { useData } from '../../DataContext';
 import { ConfirmDelete, ErrorBanner, FormGrid, TextField } from '../../components';
-import { CityProvinceFields } from '../../directories/CityProvinceFields';
+import { PlaceFields } from '../../directories/PlaceFields';
+import { citiesOfCountry, defaultCountryName } from '../../directories/geography';
 import { validateCityProvince } from '../../directories/cityLookup';
 import { resolveCityPair } from '../../directories/cityPair';
 import { cleanRecord, validateName } from '../../directories/records';
@@ -25,14 +26,17 @@ export function AgentCard({ agent, onClose }: { agent?: PaymentAgent; onClose: (
     onChange: (v: string) => setDraft((d) => ({ ...d, [key]: v })),
   });
 
+  // страна по умолчанию — Китай под текущим названием (F3); считается по загруженному набору, а не при открытии формы
+  const country = draft.country ?? defaultCountryName(ds);
+
   const save = async () => {
-    const found = { ...validateName(draft.name), ...validateCityProvince(ds.cities, draft.city, draft.province) };
+    const found = { ...validateName(draft.name), ...validateCityProvince(citiesOfCountry(ds, country), draft.city, draft.province) };
     setErrors(found);
     if (Object.keys(found).length > 0) return;
     setBusy(true);
     setSaveError(undefined);
     try {
-      const pair = await resolveCityPair(data, draft.city, draft.province);
+      const pair = await resolveCityPair(data, draft.city, draft.province, country);
       await data.save('agents', cleanRecord<PaymentAgent>({ ...draft, ...pair, id: agent?.id ?? newId('agt'), name: draft.name ?? '' } as PaymentAgent));
       onClose();
     } catch (e) {
@@ -49,8 +53,8 @@ export function AgentCard({ agent, onClose }: { agent?: PaymentAgent; onClose: (
         <TextField label="Наименование" required error={errors.name} {...text('name')} />
         <TextField label="Контактное лицо" {...text('contactPerson')} />
         <TextField label="Юридический адрес" {...text('legalAddress')} />
-        <CityProvinceFields
-          cities={ds.cities} city={draft.city} province={draft.province} provinceError={errors.province}
+        <PlaceFields
+          ds={ds} value={{ ...draft, country }} provinceError={errors.province}
           onChange={(next) => setDraft((d) => ({ ...d, ...next }))}
         />
         <TextField label="Телефон" type="tel" {...text('phone')} />

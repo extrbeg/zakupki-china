@@ -1,0 +1,9 @@
+/* Экран «География»: три колонки на широком экране, одна — на телефоне. */
+.geo-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; align-items: start; margin-top: 12px; }
+.geo-column { min-width: 0; }
+.geo-list { list-style: none; margin: 0; padding: 0; max-height: 60vh; overflow-y: auto; }
+.geo-item { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 3px 0; }
+.geo-item--active .geo-item__name { font-weight: 700; }
+.geo-item__name { flex: 1 1 auto; text-align: left; min-width: 0; }
+.geo-item__input { flex: 1 1 160px; min-width: 0; }
+.geo-item__error { flex: 1 1 100%; }

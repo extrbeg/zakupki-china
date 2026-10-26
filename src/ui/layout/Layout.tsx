@@ -8,6 +8,10 @@ import { useData, useSession } from '../DataContext';
 import { ErrorBanner } from '../components';
 import { MENU } from './menu';
 import { OfflineBanner } from './OfflineBanner';
+import { UpdateBanner } from './UpdateBanner';
+import { WhatsNewBanner } from './WhatsNewBanner';
+import { APP_VERSION, CURRENT_ENTRY } from '../../changelog';
+import { formatDate } from '../format';
 
 export function Layout({ children }: { children: ReactNode }) {
   const { session, endSession } = useSession();
@@ -40,6 +44,8 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       ) : null}
       <OfflineBanner />
+      <UpdateBanner />
+      <WhatsNewBanner />
       <div className="app__body">
         <nav id="app-nav" className={`app__nav${menuOpen ? ' app__nav--open' : ''}`} aria-label="Разделы">
           {MENU.map((m) => (
@@ -47,6 +53,9 @@ export function Layout({ children }: { children: ReactNode }) {
               {m.label}
             </NavLink>
           ))}
+          <NavLink to="/changelog" className="app__nav-link muted small" style={{ marginTop: 'auto' }}>
+            Версия {APP_VERSION} · {formatDate(CURRENT_ENTRY.date)}
+          </NavLink>
         </nav>
         <main className="app__main">
           {status === 'error' ? <ErrorBanner error={error} onRetry={() => void reload()} /> : null}

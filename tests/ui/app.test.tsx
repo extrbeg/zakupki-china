@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { App } from '../../src/ui/App';
 
-const MENU = ['Заказы', 'Поставки', 'Затраты', 'Себестоимость', 'Курсы', 'Поставщики', 'Платёжные агенты', 'Перевозчики', 'Списки', 'Настройки'];
+const MENU = ['Заказы', 'Поставки', 'Затраты', 'Себестоимость', 'Курсы', 'Поставщики', 'Платёжные агенты', 'Перевозчики', 'Списки', 'Настройки', 'Что нового'];
 
 function openAt(hash: string, demo = true) {
   if (demo) localStorage.setItem('zk:mode', 'demo');
@@ -36,7 +36,7 @@ describe('вход', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Попробовать без Google' }));
     expect(await screen.findByText('Демо — данные только в этом браузере')).toBeTruthy();
     const nav = screen.getByRole('navigation');
-    expect(within(nav).getAllByRole('link').map((a) => a.textContent)).toEqual(MENU);
+    expect(within(nav).getAllByRole('link').map((a) => a.textContent).filter((t) => !t?.startsWith('Версия '))).toEqual(MENU);
     expect(localStorage.getItem('zk:mode')).toBe('demo');
     fireEvent.click(screen.getByRole('button', { name: 'Выйти из демо' }));
     expect(screen.getByRole('button', { name: 'Попробовать без Google' })).toBeTruthy();

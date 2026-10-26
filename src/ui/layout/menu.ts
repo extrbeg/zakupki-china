@@ -10,4 +10,5 @@ export const MENU: { to: string; label: string }[] = [
   { to: '/carriers', label: 'Перевозчики' },
   { to: '/lists', label: 'Списки' },
   { to: '/settings', label: 'Настройки' },
+  { to: '/changelog', label: 'Что нового' },
 ];

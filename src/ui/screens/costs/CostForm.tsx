@@ -5,15 +5,18 @@ import { useMemo, useState } from 'react';
 import type { Cost, CostStatus, CostTargetType, Currency, Dataset, ISODate, PayeeType } from '../../../domain/model';
 import { newId } from '../../../domain/ids';
 import { useData } from '../../DataContext';
-import { ConfirmDelete, DateField, ErrorBanner, FormGrid, NumberField, SelectField, TextField, isBadNumber } from '../../components';
+import { ConfirmDelete, DateField, DirectorySelectField, ErrorBanner, FormGrid, ListSelectField, NumberField, SelectField, TextField, isBadNumber, type DirectoryEntity } from '../../components';
 import { CURRENCY_OPTIONS, formatRate, ruDate } from '../../format';
 import {
   autoRate, buildCost, draftAmounts, draftFromCost, effectiveRate, newDraft, NO_RATE_TEXT, rateIsAuto,
   type AutoRate, type CostDraft, type CostErrors,
 } from './costDraft';
 import {
-  PAYEE_TYPE_LABEL, PAYEE_TYPES, TARGET_TYPE_LABEL, TARGET_TYPES, costTypeOptions, payeeOptions, targetOptions, targetSupplierOrderId,
+  PAYEE_TYPE_LABEL, PAYEE_TYPES, TARGET_TYPE_LABEL, TARGET_TYPES, costTypeOptions, targetOptions, targetSupplierOrderId,
 } from './costRefs';
+
+/** Справочник получателя по типу «Кому платим» (кроме «текстом»). */
+const PAYEE_ENTITY: Record<Exclude<PayeeType, 'text'>, DirectoryEntity> = { supplier: 'suppliers', agent: 'agents', carrier: 'carriers' };
 
 const round2 = (n: number | undefined) => (n === undefined ? undefined : Math.round(n * 100) / 100);
 
@@ -149,8 +152,8 @@ export function CostForm({ cost, preset, onClose }: { cost?: Cost; preset?: Cost
           label="Объект привязки" value={d.targetId} options={objOptions} placeholder="— выберите —"
           onChange={setTarget} error={errors.targetId} required className="ui-card__wide"
         />
-        <SelectField
-          label="Тип затраты" value={d.costType} options={typeOptions} placeholder="— выберите —"
+        <ListSelectField
+          list="costType" label="Тип затраты" value={d.costType} options={typeOptions} placeholder="— выберите —"
           onChange={(v) => patch({ costType: v })} error={errors.costType} required
         />
         <SelectField
@@ -161,8 +164,8 @@ export function CostForm({ cost, preset, onClose }: { cost?: Cost; preset?: Cost
         {d.payeeType === 'text' ? (
           <TextField label="Получатель (текстом)" value={d.payeeText} onChange={(v) => patch({ payeeText: v })} />
         ) : d.payeeType ? (
-          <SelectField
-            label="Получатель" value={d.payeeId} options={payeeOptions(ds, d.payeeType)} placeholder="— выберите —"
+          <DirectorySelectField
+            key={d.payeeType} entity={PAYEE_ENTITY[d.payeeType]} label="Получатель" value={d.payeeId} placeholder="— выберите —"
             onChange={(v) => patch({ payeeId: v })}
           />
         ) : null}

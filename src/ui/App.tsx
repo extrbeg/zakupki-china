@@ -23,6 +23,7 @@ import ListsScreen from './screens/lists/ListsScreen';
 import SettingsScreen from './screens/settings/SettingsScreen';
 import ImportScreen from './screens/import/ImportScreen';
 import ConnectScreen from './screens/connect/ConnectScreen';
+import ChangelogScreen from './screens/changelog/ChangelogScreen';
 
 export function AppRoutes() {
   return (
@@ -42,6 +43,7 @@ export function AppRoutes() {
       <Route path="/settings" element={<SettingsScreen />} />
       <Route path="/import" element={<ImportScreen />} />
       <Route path="/connect" element={<ConnectScreen />} />
+      <Route path="/changelog" element={<ChangelogScreen />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

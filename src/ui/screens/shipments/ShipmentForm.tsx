@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { newId } from '../../../domain/ids';
 import type { Shipment } from '../../../domain/model';
 import { useData } from '../../DataContext';
-import { ConfirmDelete, DateField, ErrorBanner, FormGrid, NumberField, SelectField, TextField } from '../../components';
+import { ConfirmDelete, DateField, DirectorySelectField, ErrorBanner, FormGrid, NumberField, SelectField, TextField } from '../../components';
 import { cleanRecord } from '../../directories/records';
 import { MODE_OPTIONS } from '../../format';
 import { defaultVatRate, shipmentDeleteBlock, shipmentNumberTaken } from './shipmentLogic';
@@ -62,9 +62,8 @@ export function ShipmentForm({ shipment }: { shipment?: Shipment }) {
       <FormGrid>
         <TextField label="Номер поставки" required value={draft.number} onChange={(v) => set('number', v)} error={errors.number} />
         <SelectField label="Тип поставки" value={draft.mode} options={MODE_OPTIONS} onChange={(v) => set('mode', (v ?? 'other') as Shipment['mode'])} />
-        <SelectField
-          label="Перевозчик" value={draft.carrierId} placeholder="— не выбран —"
-          options={ds.carriers.map((c) => ({ value: c.id, label: c.name }))} onChange={(v) => set('carrierId', v)}
+        <DirectorySelectField
+          entity="carriers" label="Перевозчик" value={draft.carrierId} placeholder="— не выбран —" onChange={(v) => set('carrierId', v)}
         />
         <DateField label="Отправка на консолидацию" value={draft.consolidationDate} onChange={(v) => set('consolidationDate', v)} />
         <DateField label="Отправка в РФ" value={draft.sentDate} onChange={(v) => set('sentDate', v)} />

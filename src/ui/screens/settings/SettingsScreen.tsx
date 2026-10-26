@@ -2,6 +2,7 @@
 // параметры листа «Настройки» (портал Битрикс24, ставка НДС по умолчанию, источник курсов), выход.
 
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useData, useSession } from '../../DataContext';
 import { ErrorBanner, FormGrid, NumberField, TextField, isBadNumber } from '../../components';
 import { signOut } from '../../../google/auth';
@@ -96,6 +97,7 @@ export default function SettingsScreen() {
   return (
     <section className="screen">
       <h1 className="screen__title">Настройки</h1>
+      <p><Link to="/changelog">Что нового</Link></p>
 
       <GoogleSheetSection />
 

@@ -1,6 +1,10 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { readFileSync } from 'node:fs';
+
+// Номер версии — из package.json, в приложение попадает как import.meta.env.VITE_APP_VERSION.
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
 // base для GitHub Pages задаётся переменной VITE_BASE_PATH (например, /zakupki/); по умолчанию — корень.
 export default defineConfig(({ mode }) => {
@@ -8,11 +12,13 @@ export default defineConfig(({ mode }) => {
   const base = normalizeBase(env.VITE_BASE_PATH);
   return {
     base,
+    define: { 'import.meta.env.VITE_APP_VERSION': JSON.stringify(pkg.version) },
     plugins: [
       react(),
       VitePWA({
-        registerType: 'autoUpdate',
-        injectRegister: 'auto',
+        // prompt: новая версия не подменяет открытую молча — приложение показывает «Доступна новая версия — Обновить».
+        registerType: 'prompt',
+        injectRegister: false,
         includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
         manifest: {
           name: 'Закупки Китай',

@@ -9,6 +9,7 @@
 - `npx vitest run tests/domain/rates.test.ts` — один тестовый файл (собираются `tests/**` и `apps-script/test/**`).
 - `npm run build` — типы + сборка в `dist/` с PWA manifest и sw.
 - `npm run preview -- --port 4199 --strictPort` — раздача `dist/`.
+- Выпуск версии: при каждой публикации поднять `version` в `package.json` и дописать запись в начало `CHANGELOG.md` и `src/changelog.ts` (простым языком; тест сверяет их с `package.json`).
 
 ## Где что
 

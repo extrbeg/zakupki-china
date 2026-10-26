@@ -7,8 +7,7 @@ import { newId } from '../../../domain/ids';
 import type { Order } from '../../../domain/model';
 import { validateOrderNumberUnique } from '../../../domain/validation';
 import { useData } from '../../DataContext';
-import { CheckboxField, ConfirmDelete, DateField, ErrorBanner, FormGrid, NumberField, SelectField, TextField, isBadNumber } from '../../components';
-import { listOptions } from '../../directories/records';
+import { CheckboxField, ConfirmDelete, DateField, ErrorBanner, FormGrid, ListSelectField, NumberField, TextField, isBadNumber } from '../../components';
 import { bitrixTaskUrl, compact, nextOrderNumber, orderDeleteBlock } from './orderLogic';
 
 interface Draft {
@@ -78,7 +77,7 @@ export function OrderHeader({ order }: { order?: Order }) {
 
   const link = bitrixTaskUrl(ds.settings.bitrixPortalUrl, draft.bitrixTaskId);
   const pick = (key: 'department' | 'payer' | 'customer', label: string) => (
-    <SelectField label={label} value={draft[key]} options={listOptions(ds, key)} placeholder="—" onChange={(v) => patch({ [key]: v })} />
+    <ListSelectField list={key} label={label} value={draft[key]} placeholder="—" onChange={(v) => patch({ [key]: v })} />
   );
 
   return (

@@ -5,11 +5,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { newId } from '../../domain/ids';
 import type { Supplier } from '../../domain/model';
 import { useData } from '../DataContext';
-import { ConfirmDelete, ErrorBanner, FormGrid, SelectField, TextField } from '../components';
+import { ConfirmDelete, ErrorBanner, FormGrid, ListSelectField, TextField } from '../components';
 import { CityProvinceFields } from './CityProvinceFields';
 import { validateCityProvince } from './cityLookup';
 import { resolveCityPair } from './cityPair';
-import { cleanRecord, listOptions, validateName } from './records';
+import { cleanRecord, validateName } from './records';
 import { supplierDeleteBlock } from './usage';
 import './directories.css';
 
@@ -29,8 +29,8 @@ export function SupplierCard({ supplier }: { supplier?: Supplier }) {
     onChange: (v: string) => setDraft((d) => ({ ...d, [key]: v })),
   });
   const pick = (key: 'companyType' | 'direction' | 'specialization', list: 'companyType' | 'direction' | 'specialization') => ({
+    list,
     value: draft[key],
-    options: listOptions(ds, list),
     placeholder: '—',
     onChange: (v: string | undefined) => setDraft((d) => ({ ...d, [key]: v })),
   });
@@ -67,9 +67,9 @@ export function SupplierCard({ supplier }: { supplier?: Supplier }) {
         <h2 className="ui-card__section">Основное</h2>
         <FormGrid>
           <TextField label="Название" required error={errors.name} {...text('name')} />
-          <SelectField label="Тип компании" {...pick('companyType', 'companyType')} />
-          <SelectField label="Направление" {...pick('direction', 'direction')} />
-          <SelectField label="Специализация" {...pick('specialization', 'specialization')} />
+          <ListSelectField label="Тип компании" {...pick('companyType', 'companyType')} />
+          <ListSelectField label="Направление" {...pick('direction', 'direction')} />
+          <ListSelectField label="Специализация" {...pick('specialization', 'specialization')} />
           <TextField label="Продукция/услуги" multiline {...text('products')} />
           <TextField label="Цена (заметка)" {...text('priceNote')} />
         </FormGrid>

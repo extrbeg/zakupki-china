@@ -1,0 +1,4 @@
+/* Поле ввода нового значения под выпадающим списком (AddableSelect). */
+.select-add { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+.select-add__input { flex: 1 1 140px; min-width: 0; }
+.select-add__error { flex-basis: 100%; }

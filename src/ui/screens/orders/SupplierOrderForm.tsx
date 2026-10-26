@@ -7,9 +7,8 @@ import { newId } from '../../../domain/ids';
 import { calcRateFor, effectiveCalcDate } from '../../../domain/lineFigures';
 import type { Currency, ISODate, Order, ShipmentMode, SupplierOrder } from '../../../domain/model';
 import { useData } from '../../DataContext';
-import { ConfirmDelete, DateField, ErrorBanner, Field, FormGrid, NumberField, SelectField, TextField, isBadNumber } from '../../components';
+import { ConfirmDelete, DateField, DirectorySelectField, ErrorBanner, Field, FormGrid, ListSelectField, NumberField, SelectField, TextField, isBadNumber } from '../../components';
 import { CURRENCY_OPTIONS, MODE_OPTIONS, formatDate, formatRate } from '../../format';
-import { listOptions } from '../../directories/records';
 import { compact, plannedReadyDate, supplierOrderDeleteBlock } from './orderLogic';
 
 export const RATE_SOURCE_TEXT = { vtb: 'ВТБ', manual: 'введён вручную в «Курсах»', fixed: 'рубли' } as const;
@@ -92,20 +91,18 @@ export function SupplierOrderForm({ order, so, seq, onSaved }: { order: Order; s
     }
   };
 
-  const supplierOptions = [...ds.suppliers].sort((a, b) => a.name.localeCompare(b.name, 'ru')).map((s) => ({ value: s.id, label: s.name }));
-
   return (
     <form className="so-form" onSubmit={(e) => { e.preventDefault(); void save(); }} noValidate>
       {saveError !== undefined ? <ErrorBanner error={saveError} /> : null}
       <FormGrid>
-        <SelectField label="Поставщик" required value={draft.supplierId} options={supplierOptions} placeholder="— выберите —" error={errors.supplierId} onChange={(v) => patch({ supplierId: v })} />
+        <DirectorySelectField entity="suppliers" label="Поставщик" required value={draft.supplierId} placeholder="— выберите —" error={errors.supplierId} onChange={(v) => patch({ supplierId: v })} />
         <SelectField label="Валюта" value={draft.currency} options={CURRENCY_OPTIONS} onChange={(v) => patch({ currency: (v ?? 'CNY') as Currency })} />
         <DateField
           label="Дата расчёта" value={draft.calcDate} hint={dateHint}
           onChange={(v) => { patch({ calcDate: v }); void quickCalcDate(v); }}
         />
         <NumberField label="Курс расчёта (вручную)" value={draft.calcRate} onChange={(v) => patch({ calcRate: v })} hint={rateHint} placeholder="авто" error={errors.calcRate} />
-        <SelectField label="Условия оплаты" value={draft.paymentTerms} options={listOptions(ds, 'paymentTerms')} placeholder="—" onChange={(v) => patch({ paymentTerms: v })} />
+        <ListSelectField list="paymentTerms" label="Условия оплаты" value={draft.paymentTerms} placeholder="—" onChange={(v) => patch({ paymentTerms: v })} />
         <SelectField label="План. тип доставки" value={draft.plannedMode} options={MODE_OPTIONS} placeholder="—" onChange={(v) => patch({ plannedMode: v as ShipmentMode | undefined })} />
         <DateField label="Дата запуска" value={draft.launchDate} onChange={(v) => patch({ launchDate: v })} />
         <NumberField label="Срок изготовления, дн" value={draft.productionDays} onChange={(v) => patch({ productionDays: v })} error={errors.productionDays} />

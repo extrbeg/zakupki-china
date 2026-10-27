@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { renderAt } from './helpers';
 import { applyGeoSeed, CHINA_COUNTRY_ID, planGeoSeed, type GeoData } from '../../../src/data/geo';
 import type { Dataset } from '../../../src/domain/model';
@@ -9,6 +9,20 @@ const input = (label: RegExp) => screen.getByLabelText(label) as HTMLInputElemen
 const type = (label: RegExp, value: string) => fireEvent.change(input(label), { target: { value } });
 /** Подсказки поля «Город» — значения, которые подставит выбор. */
 const optionValues = () => suggestionValues(input(/^Город/));
+/** Ввести запрос в поле выбора и нажать Enter — выбирается первая (подсвеченная) подсказка. */
+function enter(label: RegExp, query: string) {
+  act(() => input(label).focus());
+  type(label, query);
+  fireEvent.keyDown(input(label), { key: 'Enter' });
+  act(() => input(label).blur());
+}
+/** «+ Добавить…» в поле выбора: ввод нового названия и Enter. */
+function addNew(label: RegExp, action: string, name: string, inputLabel: string) {
+  pickSuggestion(input(label), action, name);
+  const field = screen.getByLabelText(inputLabel);
+  fireEvent.change(field, { target: { value: name } });
+  fireEvent.keyDown(field, { key: 'Enter' });
+}
 
 function seed(): Partial<Dataset> {
   const empty: GeoData = { countries: [], provinces: [], cities: [] };
@@ -34,19 +48,20 @@ describe('поставщик: страна, город, провинция (G21)
     expect((screen.getByLabelText(/^Страна/) as HTMLSelectElement).value).toBe('Китай');
     type(/^Город/, 'Taiz');
     expect(optionValues()).toEqual(expect.arrayContaining(['Taizhou — Zhejiang', 'Taizhou — Jiangsu']));
-    type(/^Город/, 'Taizhou — Jiangsu');
+    pickSuggestion(input(/^Город/), 'Taizhou — Jiangsu', 'Taiz');
     expect(input(/^Город/).value).toBe('Taizhou');
     expect(input(/^Провинция/).value).toBe('Jiangsu');
-    type(/^Город/, 'Taizhou — Zhejiang');
+    pickSuggestion(input(/^Провинция/), 'Zhejiang', 'Zhej');
+    expect(input(/^Город/).value).toBe('Taizhou');   // тёзка есть и в Zhejiang — город остаётся
     expect(input(/^Провинция/).value).toBe('Zhejiang');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(async () => expect((await store.load()).suppliers).toHaveLength(1));
     expect((await store.load()).suppliers[0]).toMatchObject({ country: 'Китай', city: 'Taizhou', province: 'Zhejiang' });
   });
 
-  it('F1: город из нескольких провинций — подставляется провинция самого крупного тёзки, сохранение без ручного выбора', async () => {
+  it('F1: город из нескольких провинций — первым в списке самый крупный тёзка, Enter выбирает его с провинцией', async () => {
     const { store } = await newSupplier();
-    type(/^Город/, 'Taizhou');
+    enter(/^Город/, 'Taizhou');
     expect(input(/^Провинция/).value).toBe('Jiangsu');   // у Taizhou (Zhejiang) население в справочнике не указано
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(async () => expect((await store.load()).suppliers).toHaveLength(1));
@@ -56,14 +71,15 @@ describe('поставщик: страна, город, провинция (G21)
   it('F1/F2: Wuxi → Jiangsu, Haikou → Hainan, Suzhou → Jiangsu; тёзки в подсказках по убыванию населения, другой можно выбрать', async () => {
     await newSupplier();
     for (const [city, province] of [['Wuxi', 'Jiangsu'], ['Haikou', 'Hainan'], ['Suzhou', 'Jiangsu']]) {
-      type(/^Город/, city);
+      enter(/^Город/, city);
       expect(input(/^Провинция/).value).toBe(province);
+      enter(/^Провинция/, '');   // снять провинцию — список городов снова вся страна
     }
     type(/^Город/, 'Wuxi');
     expect(optionValues().filter((v) => v?.startsWith('Wuxi'))).toEqual(['Wuxi — Jiangsu', 'Wuxi — Hunan']);
     type(/^Город/, 'Haikou');
     expect(optionValues().filter((v) => v?.startsWith('Haikou'))).toEqual(['Haikou — Hainan', 'Haikou — Yunnan']);
-    type(/^Город/, 'Wuxi — Hunan');
+    pickSuggestion(input(/^Город/), 'Wuxi — Hunan', 'Wuxi');
     expect(input(/^Город/).value).toBe('Wuxi');
     expect(input(/^Провинция/).value).toBe('Hunan');
   });
@@ -91,12 +107,17 @@ describe('поставщик: страна, город, провинция (G21)
     const { store } = renderAt('/suppliers/new', { ...geo, agents: [{ id: 'a1', name: 'Агент Один' }] });
     await screen.findByRole('heading', { name: 'Новый поставщик' });
     type(/^Название/, 'Тест');
-    type(/^Город/, 'Wuxi');
+    enter(/^Город/, 'Wuxi');
     expect(input(/^Провинция/).value).toBe('Jiangsu');
+    enter(/^Провинция/, '');
+    type(/^Город/, 'Wux');
     expect(optionValues().filter((v) => v?.startsWith('Wuxi'))).toEqual(['Wuxi — Jiangsu', 'Wuxi — Hunan']);
-    type(/^Город/, 'Haikou');
+    enter(/^Город/, 'Haikou');
     expect(input(/^Провинция/).value).toBe('Hainan');
+    enter(/^Провинция/, '');
+    type(/^Город/, 'Haiko');
     expect(optionValues().filter((v) => v?.startsWith('Haikou'))).toEqual(['Haikou — Hainan', 'Haikou — Yunnan']);
+    pickSuggestion(input(/^Город/), 'Haikou — Hainan', 'Haik');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(async () => expect((await store.load()).suppliers).toHaveLength(1));
     expect((await store.load()).suppliers[0]).toMatchObject({ city: 'Haikou', province: 'Hainan' });
@@ -109,10 +130,10 @@ describe('поставщик: страна, город, провинция (G21)
     await screen.findByRole('heading', { name: 'Новый поставщик' });
     type(/^Название/, 'Тест');
     expect((screen.getByLabelText(/^Страна/) as HTMLSelectElement).value).toBe('КНР');
-    type(/^Город/, 'Ningbo');
+    enter(/^Город/, 'Ningbo');
     expect(input(/^Провинция/).value).toBe('Zhejiang');
-    type(/^Город/, 'Новоград');
-    type(/^Провинция/, 'Zhejiang');
+    addNew(/^Город/, '+ Добавить город…', 'Новоград', 'Новый город');
+    expect(input(/^Провинция/).value).toBe('Zhejiang');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(async () => expect((await store.load()).suppliers).toHaveLength(1));
     const ds = await store.load();
@@ -127,8 +148,8 @@ describe('поставщик: страна, город, провинция (G21)
     type(/^Город/, 'Ха');
     expect(optionValues()).toEqual(['Ханой']);
     type(/^Город/, 'Ningbo');
-    expect(input(/^Провинция/).value).toBe('');
-    type(/^Город/, 'Ханой');
+    expect(optionValues()).toEqual([]);
+    enter(/^Город/, 'Ханой');
     expect(input(/^Провинция/).value).toBe('Ханой');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(async () => expect((await store.load()).suppliers).toHaveLength(1));
@@ -138,8 +159,9 @@ describe('поставщик: страна, город, провинция (G21)
   it('новый город с новой провинцией в другой стране — оба попадают в справочник этой страны', async () => {
     const { store } = await newSupplier();
     fireEvent.change(screen.getByLabelText(/^Страна/), { target: { value: 'Вьетнам' } });
-    type(/^Город/, 'Хайфон');
-    type(/^Провинция/, 'Хайфон-регион');
+    addNew(/^Город/, '+ Добавить город…', 'Хайфон', 'Новый город');
+    addNew(/^Провинция/, '+ Добавить провинцию…', 'Хайфон-регион', 'Новая провинция');
+    expect(input(/^Город/).value).toBe('Хайфон');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(async () => expect((await store.load()).suppliers).toHaveLength(1));
     const ds = await store.load();
@@ -172,7 +194,7 @@ describe('платёжный агент: страна (G21)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Добавить агента' }));
     type(/^Наименование/, 'Агент Ханой');
     fireEvent.change(screen.getByLabelText(/^Страна/), { target: { value: 'Вьетнам' } });
-    type(/^Город/, 'Ханой');
+    enter(/^Город/, 'Ханой');
     expect(input(/^Провинция/).value).toBe('Ханой');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(async () => expect((await store.load()).agents).toHaveLength(2));

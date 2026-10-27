@@ -1,6 +1,6 @@
 import { Field } from './Field';
 
-export interface SelectOption { value: string; label: string }
+export interface SelectOption { value: string; label: string; /** Пояснение серым справа в поле с поиском (провинция у города). */ hint?: string }
 
 export interface SelectFieldProps {
   label: string;

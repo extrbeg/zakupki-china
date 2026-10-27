@@ -121,7 +121,7 @@ function SearchInput({ id, describedBy, invalid, value, options, placeholder, di
     <SuggestInput
       id={id} aria-describedby={describedBy} aria-invalid={invalid || undefined} placeholder={placeholder} disabled={disabled}
       value={typed ?? selectedLabel(options, value)} query={query} data-value={value ?? ''}
-      suggestions={shown.map((o) => ({ key: o.value, value: o.value, label: o.label }))}
+      suggestions={shown.map((o) => ({ key: o.value, value: o.value, label: o.label, hint: o.hint }))}
       moreText={all.length > shown.length ? `Ещё ${all.length - shown.length} — уточните поиск` : undefined}
       showEmpty openOnFocus autoActivate
       action={disabled ? undefined : { label: addLabel, onPick: () => { setTyped(null); onAdd(query.trim()); } }}

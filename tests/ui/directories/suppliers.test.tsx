@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { baseSeed, renderAt } from './helpers';
-import { suggestionValues } from '../components/suggest';
+import { pickSuggestion, suggestionTexts, suggestionValues } from '../components/suggest';
+import { ADD_OPTION_VALUE } from '../../../src/ui/components';
 
 const input = (label: RegExp) => screen.getByLabelText(label) as HTMLInputElement;
 const type = (label: RegExp, value: string) => fireEvent.change(input(label), { target: { value } });
+/** «+ Добавить…» в поле выбора: ввод нового названия и Enter. */
+function addNew(label: RegExp, action: string, name: string, inputLabel: string) {
+  pickSuggestion(input(label), action, name);
+  const field = screen.getByLabelText(inputLabel);
+  fireEvent.change(field, { target: { value: name } });
+  fireEvent.keyDown(field, { key: 'Enter' });
+}
 
 describe('карточка поставщика: город и провинция', () => {
   it('известный город — провинция подставляется сама, подсказки берутся из справочника городов', async () => {
@@ -18,25 +26,34 @@ describe('карточка поставщика: город и провинци�
     expect(input(/^Провинция/).value).toBe('Гуандун');
   });
 
-  it('провинцию, подставленную сама, можно поправить руками — поставщик сохраняется с поправкой', async () => {
-    const { store } = renderAt('/suppliers/new', baseSeed);
+  it('выбор провинции сужает список городов до её городов; город из другой провинции при смене снимается', async () => {
+    renderAt('/suppliers/new', baseSeed);
     await screen.findByRole('heading', { name: 'Новый поставщик' });
-    type(/^Название/, 'Эпсилон');
-    type(/^Город/, 'Нинбо');
-    expect(input(/^Провинция/).value).toBe('Чжэцзян');
-    type(/^Провинция/, 'Фуцзянь');
-    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
-    await waitFor(async () => expect((await store.load()).suppliers.some((s) => s.name === 'Эпсилон')).toBe(true));
-    const saved = (await store.load()).suppliers.find((s) => s.name === 'Эпсилон');
-    expect(saved).toMatchObject({ city: 'Нинбо', province: 'Фуцзянь' });
+    pickSuggestion(input(/^Провинция/), 'Чжэцзян', 'Чжэ');
+    act(() => input(/^Город/).focus());
+    expect(suggestionValues(input(/^Город/)).sort()).toEqual(['Вэньчжоу', 'Нинбо']);
+    pickSuggestion(input(/^Город/), 'Нинбо');
+    pickSuggestion(input(/^Провинция/), 'Гуандун', 'Гуан');
+    expect(input(/^Город/).value).toBe('');
+    expect(input(/^Провинция/).value).toBe('Гуандун');
   });
 
-  it('неизвестный город без провинции не сохраняется — ошибка у поля провинции', async () => {
+  it('город не из справочника не вводится текстом: ушли из поля — значение не меняется', async () => {
+    renderAt('/suppliers/new', baseSeed);
+    await screen.findByRole('heading', { name: 'Новый поставщик' });
+    act(() => input(/^Город/).focus());
+    type(/^Город/, 'Сямынь');
+    expect(suggestionTexts(input(/^Город/))).toEqual([]);
+    act(() => input(/^Город/).blur());
+    expect(input(/^Город/).value).toBe('');
+  });
+
+  it('«+ Добавить город…» без провинции — ошибка у провинции, запись не создаётся', async () => {
     const { store } = renderAt('/suppliers/new', baseSeed);
     await screen.findByRole('heading', { name: 'Новый поставщик' });
     type(/^Название/, 'Эпсилон');
-    type(/^Город/, 'Сямынь');
-    expect(input(/^Провинция/).value).toBe('');
+    addNew(/^Город/, '+ Добавить город…', 'Сямынь', 'Новый город');
+    expect(input(/^Город/).value).toBe('Сямынь');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     expect(await screen.findByText('Для нового города выберите провинцию')).toBeTruthy();
     const ds = await store.load();
@@ -44,18 +61,52 @@ describe('карточка поставщика: город и провинци�
     expect(ds.cities).toHaveLength(3);
   });
 
-  it('неизвестный город с выбранной провинцией — пара попадает в справочник городов', async () => {
+  it('новый город и новая провинция через «+ Добавить…» — пара попадает в справочник', async () => {
     const { store, findByTestId } = renderAt('/suppliers/new', baseSeed);
     await screen.findByRole('heading', { name: 'Новый поставщик' });
     type(/^Название/, 'Эпсилон');
-    type(/^Город/, 'Сямынь');
-    type(/^Провинция/, 'Фуцзянь');
+    addNew(/^Провинция/, '+ Добавить провинцию…', 'Фуцзянь', 'Новая провинция');
+    addNew(/^Город/, '+ Добавить город…', 'Сямынь', 'Новый город');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(async () => expect((await store.load()).cities).toHaveLength(4));
     const ds = await store.load();
     expect(ds.cities.find((c) => c.city === 'Сямынь')).toMatchObject({ province: 'Фуцзянь' });
     expect(ds.suppliers.find((s) => s.name === 'Эпсилон')).toMatchObject({ city: 'Сямынь', province: 'Фуцзянь' });
     expect((await findByTestId('where')).textContent).toBe('/suppliers');
+  });
+});
+
+describe('карточка поставщика: несколько специализаций', () => {
+  it('выбранные значения — плашками, в листе одной ячейкой через «; »; плашку можно убрать', async () => {
+    const { store } = renderAt('/suppliers/new', baseSeed);
+    await screen.findByRole('heading', { name: 'Новый поставщик' });
+    type(/^Название/, 'Мульти');
+    const spec = () => screen.getByLabelText(/^Специализация/) as HTMLSelectElement;
+    fireEvent.change(spec(), { target: { value: 'Краны' } });
+    fireEvent.change(spec(), { target: { value: 'Кабель' } });
+    expect(within(screen.getByRole('list', { name: 'Выбрано: Специализация' })).getAllByRole('listitem').map((li) => li.firstChild?.textContent))
+      .toEqual(['Краны', 'Кабель']);
+    expect([...spec().options].map((o) => o.textContent)).not.toContain('Краны');
+    fireEvent.click(screen.getByRole('button', { name: 'Убрать «Краны»' }));
+    fireEvent.change(spec(), { target: { value: 'Краны' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(async () => expect((await store.load()).suppliers).toHaveLength(5));
+    expect((await store.load()).suppliers.find((x) => x.name === 'Мульти')?.specialization).toBe('Кабель; Краны');
+  });
+
+  it('старое значение через «;» открывается плашками; «+ Добавить…» пишет новое значение в «Списки»', async () => {
+    const seed = { ...baseSeed, suppliers: [{ id: 's9', name: 'Старый', specialization: 'Краны;Фитинги, отводы' }] };
+    const { store } = renderAt('/suppliers/s9', seed);
+    await screen.findByRole('heading', { name: 'Старый' });
+    expect(within(screen.getByRole('list', { name: 'Выбрано: Специализация' })).getAllByRole('listitem').map((li) => li.firstChild?.textContent))
+      .toEqual(['Краны', 'Фитинги, отводы']);
+    fireEvent.change(screen.getByLabelText(/^Специализация/), { target: { value: ADD_OPTION_VALUE } });
+    const name = screen.getByLabelText('Новое значение: Специализация');
+    fireEvent.change(name, { target: { value: 'Насосы' } });
+    fireEvent.keyDown(name, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(async () => expect((await store.load()).suppliers[0].specialization).toBe('Краны; Фитинги, отводы; Насосы'));
+    expect((await store.load()).lists.some((l) => l.list === 'specialization' && l.value === 'Насосы')).toBe(true);
   });
 });
 
@@ -122,32 +173,55 @@ describe('удаление поставщика', () => {
 });
 
 describe('список поставщиков', () => {
-  it('группирует по провинции, внутри — по городу; без места — в конце', async () => {
+  it('одна таблица без групп, по названию: Название, Страна, Тип компании, Направление, Специализация', async () => {
     renderAt('/suppliers', baseSeed);
     await screen.findByRole('heading', { name: 'Поставщики' });
-    const h2 = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
-    expect(h2).toEqual(['Гуандун', 'Чжэцзян', 'Без провинции']);
-    const h3 = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-    expect(h3).toEqual(['Гуанчжоу', 'Вэньчжоу', 'Нинбо', 'Без города']);
+    expect(screen.queryAllByRole('heading', { level: 2 })).toEqual([]);
+    expect(screen.getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Название', 'Страна', 'Тип компании', 'Направление', 'Специализация']);
+    expect(screen.getAllByRole('link').map((a) => a.textContent)).toEqual(['Alpha Valve', 'Beta Cable', 'Delta Unknown', 'Gamma Fittings']);
+    expect(within(screen.getAllByRole('row')[1]).getAllByRole('cell')[1].textContent).toBe('Китай');   // старая строка с городом — Китай
   });
 
-  it('поиск по названию и фильтры по провинции, городу, специализации', async () => {
-    renderAt('/suppliers', baseSeed);
+  it('поиск без выбранных полей — во всех полях; с выбранными — только в них', async () => {
+    const seed = {
+      ...baseSeed,
+      suppliers: [
+        ...baseSeed.suppliers!,
+        { id: 's5', name: 'Epsilon', contactPerson: 'Ли Нин', products: 'Краны шаровые' },
+      ],
+    };
+    renderAt('/suppliers', seed);
     await screen.findByRole('heading', { name: 'Поставщики' });
     const names = () => screen.queryAllByRole('link').map((a) => a.textContent);
+    const find = (text: string) => fireEvent.change(screen.getByLabelText('Найти'), { target: { value: text } });
+    const toggle = (field: string) => fireEvent.click(within(screen.getByRole('group', { name: 'Где искать' })).getByRole('button', { name: field }));
 
-    fireEvent.change(screen.getByLabelText('Поиск по названию'), { target: { value: 'cable' } });
-    expect(names()).toEqual(['Beta Cable']);
-    fireEvent.change(screen.getByLabelText('Поиск по названию'), { target: { value: '' } });
+    find('нин');
+    expect(names()).toEqual(['Alpha Valve', 'Epsilon']);       // город «Нинбо» и контакт «Ли Нин»
+    toggle('Контактное лицо');
+    expect(names()).toEqual(['Epsilon']);
+    toggle('Город');
+    expect(names()).toEqual(['Alpha Valve', 'Epsilon']);
+    expect(screen.getByRole('status').textContent).toBe('Найдено: 2 из 5');
 
-    fireEvent.change(screen.getByLabelText('Провинция'), { target: { value: 'Чжэцзян' } });
-    expect(names().sort()).toEqual(['Alpha Valve', 'Gamma Fittings']);
-    fireEvent.change(screen.getByLabelText('Город'), { target: { value: 'Нинбо' } });
-    expect(names()).toEqual(['Alpha Valve']);
-    fireEvent.change(screen.getByLabelText('Город'), { target: { value: '' } });
-    fireEvent.change(screen.getByLabelText('Провинция'), { target: { value: '' } });
-    fireEvent.change(screen.getByLabelText('Специализация'), { target: { value: 'Кабель' } });
-    expect(names()).toEqual(['Beta Cable']);
+    find('кран');
+    toggle('Контактное лицо');
+    toggle('Город');
+    toggle('Специализация');
+    expect(names()).toEqual(['Alpha Valve', 'Gamma Fittings']);
+    toggle('Продукция');
+    expect(names()).toEqual(['Alpha Valve', 'Epsilon', 'Gamma Fittings']);
+
+    find('чжэцзян');
+    toggle('Специализация');
+    toggle('Продукция');
+    toggle('Провинция');
+    expect(names()).toEqual(['Alpha Valve', 'Gamma Fittings']);
+    find('нет такого');
+    expect(screen.getByText('Ничего не найдено')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Сбросить поиск' }));
+    expect(names()).toHaveLength(5);
+    expect(within(screen.getByRole('group', { name: 'Где искать' })).getByRole('button', { name: 'Провинция' }).getAttribute('aria-pressed')).toBe('false');
   });
 
   it('нет поставщиков — пустое состояние с кнопкой «Добавить поставщика», она ведёт в новую карточку', async () => {

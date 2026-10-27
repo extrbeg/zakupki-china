@@ -1,11 +1,13 @@
 // Карточка поставщика: все поля истории 16 (контакты, адрес, банковские реквизиты). Создание и правка.
+// Специализаций может быть несколько — в листе одной ячейкой через «; » (`domain/multiValue`).
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { newId } from '../../domain/ids';
+import { joinMultiValue, splitMultiValue } from '../../domain/multiValue';
 import type { Supplier } from '../../domain/model';
 import { useData } from '../DataContext';
-import { ConfirmDelete, ErrorBanner, FormGrid, ListSelectField, TextField } from '../components';
+import { ConfirmDelete, ErrorBanner, FormGrid, ListSelectField, MultiListSelectField, TextField } from '../components';
 import { PlaceFields } from './PlaceFields';
 import { citiesOfCountry, defaultCountryName } from './geography';
 import { validateCityProvince } from './cityLookup';
@@ -29,7 +31,7 @@ export function SupplierCard({ supplier }: { supplier?: Supplier }) {
     value: draft[key] as string | undefined,
     onChange: (v: string) => setDraft((d) => ({ ...d, [key]: v })),
   });
-  const pick = (key: 'companyType' | 'direction' | 'specialization', list: 'companyType' | 'direction' | 'specialization') => ({
+  const pick = (key: 'companyType' | 'direction', list: 'companyType' | 'direction') => ({
     list,
     value: draft[key],
     placeholder: '—',
@@ -73,7 +75,10 @@ export function SupplierCard({ supplier }: { supplier?: Supplier }) {
           <TextField label="Название" required error={errors.name} {...text('name')} />
           <ListSelectField label="Тип компании" {...pick('companyType', 'companyType')} />
           <ListSelectField label="Направление" {...pick('direction', 'direction')} />
-          <ListSelectField label="Специализация" {...pick('specialization', 'specialization')} />
+          <MultiListSelectField
+            list="specialization" label="Специализация" values={splitMultiValue(draft.specialization)}
+            onChange={(values) => setDraft((d) => ({ ...d, specialization: joinMultiValue(values) }))}
+          />
           <TextField label="Продукция/услуги" multiline {...text('products')} />
           <TextField label="Цена (заметка)" {...text('priceNote')} />
         </FormGrid>

@@ -59,6 +59,20 @@ describe('демо-набор', () => {
     expect((ds.meta ?? {}).geoVersion).toBe(GEO_VERSION);
   });
 
+  it('G28/G29/G33: номера заказов, поставок и затрат по правилам; типы поставки заведены, поставки ссылаются на них', () => {
+    const ds = demoSeed();
+    for (const o of ds.orders!) expect(o.code).toBe(`З-${o.date.slice(0, 4)}-${String(o.number).padStart(3, '0')}`);
+    expect(ds.shipmentTypes!.map((t) => t.name)).toEqual(['Море, контейнер', 'Авто, контейнер', 'Ж/д, контейнер', 'Авиа', 'Авто, сборный груз']);
+    const types = new Set(ds.shipmentTypes!.map((t) => t.id));
+    for (const s of ds.shipments!) {
+      expect(s.number).toMatch(/^П-\d{4}-\d{3}$/);
+      expect(types.has(s.typeId!)).toBe(true);
+    }
+    const codes = ds.costs!.map((c) => c.code);
+    expect(codes.every((c) => /^Р-\d{4}-(П)?\d{3}-\d{3}$/.test(c ?? ''))).toBe(true);
+    expect(new Set(codes).size).toBe(codes.length);
+  });
+
   it('createDemoStore сидит данные один раз и хранит их в localStorage', async () => {
     const store = createDemoStore();
     expect(store.kind).toBe('local');

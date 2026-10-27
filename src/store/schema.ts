@@ -59,6 +59,7 @@ export const SHEETS: SheetDef[] = [
       id, c('number', 'Заказ', 'int'), c('date', 'Дата заказа', 'date'), c('department', 'Подразделение'), c('payer', 'Плательщик'),
       c('customer', 'Заказчик'), c('title', 'Название'), c('bitrixTaskId', 'ID задачи Битрикс'), c('calcDate', 'Дата расчёта', 'date'),
       c('costsComplete', 'Все затраты внесены', 'bool'), c('comment', 'Комментарий'), c('createdAt', 'Создан', 'datetime'),
+      c('code', 'Номер заказа'),   // G33: «З-ГГГГ-NNN»; в конце — ensureSchema дописывает её в существующие таблицы
     ],
   },
   {
@@ -81,10 +82,13 @@ export const SHEETS: SheetDef[] = [
       { key: 'techParamsEn', header: 'Tech EN (авто)', type: 'formula', formula: translate('techParams') },
     ],
   },
+  // G29: тип поставки — справочник с правилом деления доставки ('cbm' | 'weight').
+  { entity: 'shipmentTypes', sheet: 'Типы поставки', columns: [id, c('name', 'Название'), c('basis', 'Делить доставку')] },
   {
     entity: 'shipments', sheet: 'Поставки', columns: [
       id, c('number', 'Поставка'), c('mode', 'Тип'), c('carrierId', 'Перевозчик'), c('consolidationDate', 'Отправка на консолидацию', 'date'),
       c('sentDate', 'Отправка в РФ', 'date'), c('arrivalDate', 'Прибытие на СВХ', 'date'), c('vatRate', 'НДС %', 'number'), c('comment', 'Комментарий'),
+      c('typeId', 'typeId'), c('containerNo', 'Номер контейнера / накладной'),   // G28/G29: в конце
     ],
   },
   {
@@ -101,6 +105,7 @@ export const SHEETS: SheetDef[] = [
       c('executor', 'Исполнитель операции'), c('invoiceNumber', 'Номер счёта'), c('invoiceDate', 'Дата счёта', 'date'), c('amount', 'Сумма в валюте', 'number'),
       c('currency', 'Валюта'), c('rate', 'Курс', 'number'), c('rateDate', 'Дата курса', 'date'), c('rateManual', 'Курс вручную', 'bool'),
       c('amountRub', 'Сумма в р.', 'number'), c('comment', 'Комментарий'),
+      c('code', 'Номер затраты'),   // G33: «Р-ГГГГ-<заказ>-NNN» / «Р-ГГГГ-П<NNN>-NNN»; в конце
     ],
   },
 ];

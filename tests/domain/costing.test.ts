@@ -144,6 +144,33 @@ describe('распределение: поставка', () => {
     expect(codes(res)).not.toContain('NO_CBM');
   });
 
+  describe('тип поставки задаёт правило доставки (G29)', () => {
+    const withType = (mode: ShipmentMode, typeId: string, types: Dataset['shipmentTypes']) => {
+      const d = twoLines({ mode, batchA: { cbm: 2, weight: 100 }, batchB: { cbm: 6, weight: 900 } });
+      d.shipments[0].typeId = typeId;
+      d.shipmentTypes = types;
+      d.costs = [cost('c1', 'shipment', 'sh1', 'Доставка', 8000)];
+      return computeCosting(d, TODAY);
+    };
+
+    it('тип «по объёму» — по CBM, даже если прежний тип поставки «авиа»', () => {
+      const res = withType('air', 't_rail', [{ id: 't_rail', name: 'Ж/д, контейнер', basis: 'cbm' }]);
+      expect(batchOf(res, 'bA').breakdown.delivery).toBeCloseTo(2000, 9);
+      expect(batchOf(res, 'bB').breakdown.delivery).toBeCloseTo(6000, 9);
+    });
+
+    it('тип «по весу» — по весу, даже если прежний тип «море, контейнер»', () => {
+      const res = withType('sea_container', 't_gr', [{ id: 't_gr', name: 'Авто, сборный груз', basis: 'weight' }]);
+      expect(batchOf(res, 'bA').breakdown.delivery).toBeCloseTo(800, 9);
+      expect(batchOf(res, 'bB').breakdown.delivery).toBeCloseTo(7200, 9);
+    });
+
+    it('тип не найден в справочнике — как раньше, по прежнему типу поставки', () => {
+      const res = withType('sea_container', 'нет_такого', []);
+      expect(batchOf(res, 'bA').breakdown.delivery).toBeCloseTo(2000, 9);
+    });
+  });
+
   it('контейнер (авто) — CBM есть не у всех партий: партия без CBM — доля по весу, остаток по CBM; NO_CBM со списком партий без CBM', () => {
     const d = twoLines({ mode: 'road_container', batchA: { cbm: 2, weight: 100 }, batchB: { weight: 300 } });
     d.costs = [cost('c1', 'shipment', 'sh1', 'Доставка', 4000)];

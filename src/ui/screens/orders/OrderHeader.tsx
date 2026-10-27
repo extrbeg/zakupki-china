@@ -1,4 +1,4 @@
-// Шапка заказа: номер, дата, подразделение, плательщик, заказчик, название, ID задачи Битрикс, дата расчёта, «Все затраты внесены».
+// Шапка заказа: номер (З-ГГГГ-NNN, G33), дата, подразделение, плательщик, заказчик, название, ID задачи Битрикс, дата расчёта, «Все затраты внесены».
 // Дата расчёта и флаг «Все затраты внесены» у существующего заказа сохраняются сразу — итоги пересчитываются без нажатия «Сохранить».
 
 import { useState } from 'react';
@@ -7,12 +7,13 @@ import { newId } from '../../../domain/ids';
 import type { Order } from '../../../domain/model';
 import { validateOrderNumberUnique } from '../../../domain/validation';
 import { useData } from '../../DataContext';
-import { CheckboxField, ConfirmDelete, DateField, ErrorBanner, FormGrid, ListSelectField, NumberField, TextField, isBadNumber } from '../../components';
-import { bitrixTaskUrl, compact, nextOrderNumber, orderDeleteBlock } from './orderLogic';
+import { CheckboxField, ConfirmDelete, DateField, ErrorBanner, FormGrid, ListSelectField, TextField } from '../../components';
+import { nextOrderCode, orderLabel, orderRef } from '../../../domain/numbering';
+import { bitrixTaskUrl, compact, orderDeleteBlock, readOrderNumber } from './orderLogic';
 
 interface Draft {
-  /** Как отдаёт NumberField: пусто — undefined, не число — NaN. */
-  number: number | undefined; date: string | undefined; department?: string; payer?: string; customer?: string; title: string;
+  /** Текст поля «Номер заказа»: `З-ГГГГ-NNN`, у старого заказа — прежний номер (G33). */
+  number: string; date: string | undefined; department?: string; payer?: string; customer?: string; title: string;
   bitrixTaskId: string; calcDate?: string; costsComplete: boolean; comment: string;
 }
 
@@ -21,12 +22,14 @@ export function OrderHeader({ order }: { order?: Order }) {
   const { ds } = data;
   const navigate = useNavigate();
   const [draft, setDraft] = useState<Draft>(() => ({
-    number: order ? order.number : nextOrderNumber(ds.orders),
+    number: order ? orderLabel(order) : nextOrderCode(ds.orders, data.today).code,
     date: order?.date ?? data.today,
     department: order?.department, payer: order?.payer, customer: order?.customer,
     title: order?.title ?? '', bitrixTaskId: order?.bitrixTaskId ?? '', calcDate: order?.calcDate,
     costsComplete: order?.costsComplete ?? false, comment: order?.comment ?? '',
   }));
+  /** Номер нового заказа правили руками — он больше не следует за годом даты. */
+  const [numberTouched, setNumberTouched] = useState(Boolean(order));
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saveError, setSaveError] = useState<unknown>(undefined);
   const [busy, setBusy] = useState(false);
@@ -46,20 +49,21 @@ export function OrderHeader({ order }: { order?: Order }) {
 
   const save = async () => {
     const found: Record<string, string> = {};
-    const number = draft.number;
     const id = order?.id ?? newId('ord');
-    if (number === undefined || isBadNumber(number)) found.number = 'Введите номер заказа — целое число';
-    else Object.assign(found, validateOrderNumberUnique(ds, { id, number }));
+    const read = readOrderNumber(draft.number, draft.date, Boolean(order) && !order?.code);
+    if ('error' in read) found.number = read.error;
+    else Object.assign(found, validateOrderNumberUnique(ds, { id, number: read.number, code: read.code, date: draft.date }));
     if (!draft.date) found.date = 'Укажите дату заказа';
     setErrors(found);
-    if (Object.keys(found).length > 0) return;
+    if (Object.keys(found).length > 0 || 'error' in read) return;
     setBusy(true);
     setSaveError(undefined);
     try {
       const record = compact<Order>({
         ...order,
         id,
-        number: number as number,
+        number: read.number,
+        code: read.code,
         date: draft.date as string,
         department: draft.department, payer: draft.payer, customer: draft.customer,
         title: draft.title, bitrixTaskId: draft.bitrixTaskId, calcDate: draft.calcDate,
@@ -82,12 +86,18 @@ export function OrderHeader({ order }: { order?: Order }) {
 
   return (
     <section className="ui-card" aria-label="Шапка заказа">
-      <h2 className="ui-card__title">{order ? `Заказ № ${order.number}` : 'Новый заказ'}</h2>
+      <h2 className="ui-card__title">{order ? `Заказ ${orderRef(order)}` : 'Новый заказ'}</h2>
       {saveError !== undefined ? <ErrorBanner error={saveError} /> : null}
       <form onSubmit={(e) => { e.preventDefault(); void save(); }} noValidate>
         <FormGrid>
-          <NumberField label="Номер заказа" required value={draft.number} onChange={(v) => patch({ number: v })} error={errors.number} />
-          <DateField label="Дата заказа" required value={draft.date} onChange={(v) => patch({ date: v })} error={errors.date} />
+          <TextField
+            label="Номер заказа" required value={draft.number} error={errors.number} hint={order ? undefined : 'Присваивается сам: З-ГГГГ-NNN'}
+            onChange={(v) => { setNumberTouched(true); patch({ number: v }); }}
+          />
+          <DateField
+            label="Дата заказа" required value={draft.date} error={errors.date}
+            onChange={(v) => patch({ date: v, ...(numberTouched || !v ? {} : { number: nextOrderCode(ds.orders, v).code }) })}
+          />
           {pick('department', 'Подразделение')}
           {pick('payer', 'Плательщик')}
           {pick('customer', 'Заказчик')}

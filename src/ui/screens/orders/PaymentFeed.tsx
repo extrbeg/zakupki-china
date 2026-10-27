@@ -8,6 +8,7 @@ import { useData } from '../../DataContext';
 import { DataTable, type DataColumn } from '../../components';
 import { EMPTY, formatDate, formatMoney } from '../../format';
 import { supplierOrderCode } from './orderLogic';
+import { orderLabel } from '../../../domain/numbering';
 
 const feedDate = (c: Cost) => c.paymentDate ?? c.entryDate;
 
@@ -25,7 +26,7 @@ export function PaymentFeed({ order }: { order: Order }) {
       if (c.targetType === 'line') {
         const l = lines.get(c.targetId);
         const so = l ? sos.get(l.supplierOrderId) : undefined;
-        return l ? `Позиция ${so ? supplierOrderCode(order, so) : order.number}-${l.seq}` : null;
+        return l ? `Позиция ${so ? supplierOrderCode(order, so) : orderLabel(order)}-${l.seq}` : null;
       }
       return null;
     };
@@ -39,6 +40,7 @@ export function PaymentFeed({ order }: { order: Order }) {
   type Row = (typeof rows)[number];
   const columns: DataColumn<Row>[] = [
     { key: 'date', header: 'Дата', render: (r) => formatDate(feedDate(r.cost)) },
+    { key: 'code', header: 'Номер', render: (r) => r.cost.code ?? '' },
     { key: 'type', header: 'Тип затрат', render: (r) => r.cost.costType },
     { key: 'target', header: 'Привязка', render: (r) => r.target },
     { key: 'amount', header: 'Сумма', align: 'right', render: (r) => (r.cost.amount === undefined ? EMPTY : `${formatMoney(r.cost.amount)} ${r.cost.currency}`) },

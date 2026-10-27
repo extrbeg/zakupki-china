@@ -1,6 +1,7 @@
 // Экран «Себестоимость» (маршрут /costing): выбираю номера заказов — вижу себестоимость каждой позиции «В работу».
 // Выбор — только фильтр показа; общие затраты поставки движок делит по всем партиям (R18.1).
 
+import { compareOrders, orderRef } from '../../../domain/numbering';
 import { Fragment, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EmptyState, ErrorBanner, TextField } from '../../components';
@@ -69,8 +70,8 @@ export default function CostingScreen() {
   const orders = useMemo(() => {
     const q = query.trim().toLowerCase();
     return [...ds.orders]
-      .sort((a, b) => b.number - a.number)
-      .filter((o) => !q || `${o.number} ${o.title ?? ''} ${o.customer ?? ''}`.toLowerCase().includes(q));
+      .sort((a, b) => compareOrders(b, a))
+      .filter((o) => !q || `${o.number} ${o.code ?? ''} ${o.title ?? ''} ${o.customer ?? ''}`.toLowerCase().includes(q));
   }, [ds.orders, query]);
 
   const rows = useMemo(() => buildRows(ds, costing, selected), [ds, costing, selected]);
@@ -119,7 +120,7 @@ export default function CostingScreen() {
               <li key={o.id}>
                 <label className="checkbox">
                   <input type="checkbox" checked={selected.has(o.id)} onChange={() => setSelected(toggle(selected, o.id))} />
-                  <span>№ {o.number}{o.title ? ` · ${o.title}` : ''}{o.customer ? ` · ${o.customer}` : ''}</span>
+                  <span>{orderRef(o)}{o.title ? ` · ${o.title}` : ''}{o.customer ? ` · ${o.customer}` : ''}</span>
                 </label>
               </li>
             ))}
@@ -188,7 +189,7 @@ export default function CostingScreen() {
                               {isOpen ? '−' : '+'}
                             </button>
                           </td>
-                          <td>№ {r.order.number}</td>
+                          <td>{orderRef(r.order)}</td>
                           <td>{r.supplier?.name ?? EMPTY}</td>
                           <td>{title}</td>
                           <td className="costing-num">{formatQty(r.line.qty)}</td>

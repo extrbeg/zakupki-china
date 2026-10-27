@@ -1,11 +1,12 @@
 // Экран «Заказ» (маршрут /orders/:id; id = new — создание): шапка, итоги, вкладки «Поставщики и товары» (блоки поставщиков
-// с позициями) и «Сравнение цен» (?tab=compare — товары × поставщики, выбор «В работу»), лента платежей.
+// с позициями) и «Сравнение цен» (?tab=compare — товары × поставщики, выбор «В работу»), поставки заказа, лента платежей.
 
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useData } from '../../DataContext';
 import { EmptyState } from '../../components';
 import { OrderHeader } from './OrderHeader';
+import { OrderShipments } from './OrderShipments';
 import { OrderTotals } from './OrderTotals';
 import { PaymentFeed } from './PaymentFeed';
 import { PriceComparison } from './PriceComparison';
@@ -87,6 +88,7 @@ export default function OrderScreen() {
           )}
         </div>
       </PurchasedProvider>
+      <OrderShipments order={order} />
       <PaymentFeed order={order} />
     </section>
   );

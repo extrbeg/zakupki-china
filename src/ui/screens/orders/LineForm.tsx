@@ -16,7 +16,7 @@ import { useData } from '../../DataContext';
 import { CheckboxField, ConfirmDelete, ErrorBanner, Field, FormGrid, NumberField, TextField, isBadNumber } from '../../components';
 import { formatCoef, formatMoney } from '../../format';
 import { AD_LABEL } from './coefLabels';
-import { compact, lineDeleteBlock, suggestionBasis, suggestionText } from './orderLogic';
+import { compact, lineDeleteBlock, suggestionBasis, suggestionText, supplierOrderCode } from './orderLogic';
 import { ProductNameInput, fillNote, useProductHints } from './ProductNameInput';
 
 type NumKey = 'qty' | 'unitPrice' | 'dutyRate' | 'cbm' | 'weight' | 'places' | 'coef';
@@ -128,7 +128,7 @@ export function LineForm({ order, so, line, nextSeq, rate, onClose }: {
   const enHint = data.store.kind === 'local' ? 'перевод появится в Google-таблице' : '';
   return (
     <form className="line-form" aria-label="Позиция" onSubmit={(e) => { e.preventDefault(); void save(); }} noValidate>
-      <h4 style={{ margin: '0 0 8px' }}>{line ? `Позиция ${order.number}-${so.seq}-${line.seq}` : 'Новая позиция'}</h4>
+      <h4 style={{ margin: '0 0 8px' }}>{line ? `Позиция ${supplierOrderCode(order, so)}-${line.seq}` : 'Новая позиция'}</h4>
       {saveError !== undefined ? <ErrorBanner error={saveError} /> : null}
       <FormGrid>
         <Field label="Название от заказчика" hint={fillNote(exactProductHint(hints, draft.texts.customerName)) || 'Начните вводить — подскажем товар из прошлых позиций'}>

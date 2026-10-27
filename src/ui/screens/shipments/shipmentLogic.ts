@@ -1,7 +1,8 @@
 // Чистая логика экранов поставок: подписи, остатки позиций, раскладка по декларациям, запреты на удаление.
 
 import { newId } from '../../../domain/ids';
-import type { Batch, Cost, Dataset, Declaration, Line, Shipment } from '../../../domain/model';
+import type { Batch, Cost, Dataset, Declaration, Line, Order, Shipment } from '../../../domain/model';
+import { compareOrders, orderLabel, orderRef } from '../../../domain/numbering';
 import { formatMoney, formatQty } from '../../format';
 
 export const DEFAULT_VAT = 22;
@@ -26,6 +27,8 @@ export function shippedQty(ds: Pick<Dataset, 'batches'>, lineId: string, exceptB
 export interface LineChoice {
   line: Line;
   orderNumber: number | undefined;
+  /** Номер заказа для показа: код З-ГГГГ-NNN, у старого — прежний номер. */
+  orderLabel: string;
   supplierName: string;
   title: string;
   remaining: number;
@@ -38,19 +41,24 @@ export function lineChoices(ds: Dataset): (LineChoice & { search: string })[] {
   const orders = new Map(ds.orders.map((o) => [o.id, o]));
   const sos = new Map(ds.supplierOrders.map((s) => [s.id, s]));
   const suppliers = new Map(ds.suppliers.map((s) => [s.id, s]));
-  const out: (LineChoice & { search: string })[] = [];
+  const out: (LineChoice & { search: string; order: Order | undefined })[] = [];
   for (const line of ds.lines) {
     if (!line.purchased) continue;
     const remaining = line.qty - shippedQty(ds, line.id);
     if (remaining <= 0) continue;
-    const orderNumber = orders.get(line.orderId)?.number;
+    const order = orders.get(line.orderId);
+    const orderNumber = order?.number;
+    const shown = order ? orderRef(order) : '№ ?';
+    const label0 = order ? orderLabel(order) : '';
     const supplierName = suppliers.get(sos.get(line.supplierOrderId)?.supplierId ?? '')?.name ?? line.supplierName ?? '';
     const title = line.customerName || line.docName || line.supplierName || `позиция ${line.seq}`;
-    const label = `Заказ № ${orderNumber ?? '?'} · ${supplierName || 'без поставщика'} · ${line.seq}. ${title} — остаток ${formatQty(remaining)} из ${formatQty(line.qty)} шт`;
-    const search = [`заказ ${orderNumber ?? ''}`, `№ ${orderNumber ?? ''}`, supplierName, line.customerName, line.docName, line.supplierName, line.techParams].filter(Boolean).join(' ').toLowerCase();
-    out.push({ line, orderNumber, supplierName, title, remaining, label, search });
+    const label = `Заказ ${shown} · ${supplierName || 'без поставщика'} · ${line.seq}. ${title} — остаток ${formatQty(remaining)} из ${formatQty(line.qty)} шт`;
+    const search = [`заказ ${orderNumber ?? ''}`, `№ ${orderNumber ?? ''}`, order?.code, supplierName, line.customerName, line.docName, line.supplierName, line.techParams].filter(Boolean).join(' ').toLowerCase();
+    out.push({ line, orderNumber, orderLabel: label0, supplierName, title, remaining, label, search, order });
   }
-  return out.sort((a, b) => (a.orderNumber ?? 0) - (b.orderNumber ?? 0) || a.line.seq - b.line.seq);
+  return out
+    .sort((a, b) => (a.order && b.order ? compareOrders(a.order, b.order) : (a.orderNumber ?? 0) - (b.orderNumber ?? 0)) || a.line.seq - b.line.seq)
+    .map(({ order: _o, ...rest }) => rest);
 }
 
 export type Defaults = { cbm?: number; weight?: number; places?: number };

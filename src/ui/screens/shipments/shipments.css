@@ -14,3 +14,25 @@
 .ship-decl__note { font-size: 0.85rem; color: var(--c-muted); }
 .ship-new-decl { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 16px; margin-top: 8px; }
 .ship-new-decl .field { flex: 1 1 180px; max-width: 260px; }
+/* «Что едет»: группы заказ → поставщик, итоги поставки. */
+.table .ship-group th { background: var(--c-bg); color: var(--c-text, inherit); font-size: 0.93rem; text-align: left; white-space: normal; position: static; }
+.table .ship-subgroup td { color: var(--c-muted); font-size: 0.87rem; padding-left: 22px; white-space: normal; }
+.ship-item-name { padding-left: 22px !important; white-space: normal !important; min-width: 8rem; }
+.table .ship-totals td { border-top: 2px solid var(--c-border); font-weight: 600; border-bottom: 0; white-space: normal; }
+.ship-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; }
+.ship-head .ui-card__title { margin-bottom: 8px; }
+/* Отправка товаров заказа в поставку (из заказа и из поставки). */
+.ship-send { margin: 12px 0; padding: 12px; border: 1px solid var(--c-border); border-radius: var(--radius); background: var(--c-bg); }
+.ship-send__title { font-size: 1rem; margin: 0 0 8px; }
+.ship-send .table { background: var(--c-surface, #fff); }
+.ship-send-table__name { white-space: normal !important; min-width: 9rem; }
+.table.ship-send-table .ship-send-table__qty { width: 6.5rem; min-width: 0; min-height: 30px; }
+.ship-send-table__err { display: block; white-space: normal; max-width: 12rem; margin-left: auto; text-align: right; }
+.ship-done { margin: 8px 0; }
+/* Компактная таблица «Что едет» и «Отправить в поставку»: на 1024/1280 помещается целиком, на телефоне — прокрутка внутри блока. */
+.table.ship-what, .table.ship-send-table { font-size: 0.85rem; }
+.table.ship-what th, .table.ship-send-table th { white-space: normal; vertical-align: bottom; line-height: 1.2; font-size: 0.78rem; }
+.table.ship-what th, .table.ship-what td, .table.ship-send-table th, .table.ship-send-table td { padding: 5px 6px; }
+.table.ship-what .ship-select { min-width: 0; width: 7rem; min-height: 30px; padding: 3px 6px; }
+.table.ship-what .btn--small { padding: 1px 6px; }
+.ship-row-actions { display: inline-flex; flex-direction: column; align-items: stretch; gap: 4px; }

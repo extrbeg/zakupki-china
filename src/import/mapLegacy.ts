@@ -1,6 +1,9 @@
 // Маппинг старой таблицы в сущности приложения (spec «Решения по реализации» → «Маппинг импорта»).
 // Чистая функция: на входе значения листов, на выходе записи, проблемы и счётчики. Колонки ищутся по заголовкам.
 
+import { emptyDataset } from '../domain/model';
+import { planCostCodes } from '../domain/numbering';
+import { TYPE_ID_BY_MODE } from '../domain/shipmentTypes';
 import type { Batch, Carrier, City, Cost, Currency, ISODate, Line, ListItem, ListKey, Order, PaymentAgent, Rate, Shipment, Supplier, SupplierOrder } from '../domain/model';
 import { sheetFor } from '../store/schema';
 import { newId } from '../domain/ids';
@@ -211,7 +214,7 @@ function mapShipment(order: Order, sub: SubOrder, col: OrderCols): { shipment: S
   if (shippedRows.length === 0) return null;
   const first = (c: number) => firstOf(shippedRows, (r) => date(r[c]));
   const shipment: Shipment = compact({
-    id: newId('shp'), number: `${order.number}-${sub.so.seq}`, mode: 'other' as const,
+    id: newId('shp'), number: `${order.number}-${sub.so.seq}`, mode: 'other' as const, typeId: TYPE_ID_BY_MODE.other,
     consolidationDate: first(col.consolidationDate), sentDate: first(col.sentDate), arrivalDate: first(col.arrivalDate),
     vatRate: DEFAULT_VAT_RATE,
   });
@@ -404,7 +407,9 @@ function mapCosts(ctx: Ctx) {
       amountRub: rubCell ?? (currency === 'RUB' ? amount : undefined), comment,
     }));
   }
-  ctx.data.costs = costs;
+  // G33: номера затрат по порядку дат внутри заказа (заказы старой таблицы — без кода, номер заказа — прежний)
+  const codes = new Map(planCostCodes({ ...emptyDataset(), orders: ctx.data.orders ?? [], costs }).map((c) => [c.id, c.code]));
+  ctx.data.costs = costs.map((c) => (codes.has(c.id) ? { ...c, code: codes.get(c.id) } : c));
 }
 
 // ---------- «Списки»: списки, города, курсы ----------

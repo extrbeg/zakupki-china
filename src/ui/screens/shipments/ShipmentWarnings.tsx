@@ -1,6 +1,7 @@
 // Предупреждения движка по этой поставке: нет CBM, нет веса, партии без декларации (истории 40, 42).
 
 import type { Dataset } from '../../../domain/model';
+import { orderRef } from '../../../domain/numbering';
 import { useData, type CostWarning } from '../../DataContext';
 
 const CODES: CostWarning['code'][] = ['NO_CBM', 'NO_WEIGHT', 'NO_DECLARATION'];
@@ -12,7 +13,7 @@ export function batchTitle(ds: Dataset, batchId: string): string {
   const line = ds.lines.find((l) => l.id === batch.lineId);
   const order = ds.orders.find((o) => o.id === line?.orderId);
   const name = line?.customerName || line?.docName || line?.supplierName || `позиция ${line?.seq ?? '?'}`;
-  return `Заказ № ${order?.number ?? '?'} · ${name} · ${batch.qty} шт`;
+  return `Заказ ${order ? orderRef(order) : '№ ?'} · ${name} · ${batch.qty} шт`;
 }
 
 export function ShipmentWarnings({ shipmentId, onPickBatch }: { shipmentId: string; onPickBatch: (batchId: string) => void }) {

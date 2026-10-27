@@ -1,15 +1,23 @@
 // Экран «Затраты» (маршрут /costs): журнал затрат с фильтрами и карточка затраты (R16, R17).
 // Адрес принимает `?order=<id>`, `?shipment=<id>` (фильтры) и `?add=<targetType>:<targetId>` (новая затрата с привязкой).
+// Фильтр «Заказ» показывает и доли затрат поставок, легшие на заказ (G31): строка «доля поставки П-…» с рублями доли.
 
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { orderShipmentCostsWithoutRub, orderShipmentShares } from '../../../domain/costShares';
 import type { Cost, CostStatus, CostTargetType, ISODate } from '../../../domain/model';
 import { useData } from '../../DataContext';
 import { DataTable, DateField, EmptyState, SelectField, type DataColumn } from '../../components';
 import { CURRENCY_LABEL, formatMoney, formatRate, ruDate } from '../../format';
+import { formatSharePct } from './splitText';
 import { CostForm, type CostFormPreset } from './CostForm';
 import { TARGET_TYPES, costOrderId, costShipmentId, costTypeOptions, payeeLabel, targetLabel, targetOptions } from './costRefs';
 import '../rates/rates.css';
+import './costs.css';
+
+/** Строка журнала: затрата целиком или доля затраты поставки, легшая на заказ из фильтра. */
+/** share.rub/pct = null — у затраты нет рублей (нет курса), долю не посчитать. */
+interface Row { cost: Cost; share?: { rub: number | null; pct: number | null; shipmentId: string } }
 
 type Open = { mode: 'new'; preset?: CostFormPreset } | { mode: 'edit'; id: string } | null;
 
@@ -35,23 +43,31 @@ export default function CostsScreen() {
 
   const rubById = useMemo(() => new Map(costing.costsRub.map((r) => [r.costId, r])), [costing.costsRub]);
 
-  const rows = useMemo(() => {
-    return ds.costs
-      .filter((c) => !filters.order || costOrderId(ds, c) === filters.order)
+  const rows = useMemo((): Row[] => {
+    const direct: Row[] = ds.costs.filter((c) => !filters.order || costOrderId(ds, c) === filters.order).map((c) => ({ cost: c }));
+    const shares: Row[] = filters.order
+      ? [
+        ...orderShipmentShares(ds, costing, filters.order).map((s) => ({ cost: s.cost, share: { rub: s.rub, pct: s.pct, shipmentId: s.shipmentId } })),
+        ...orderShipmentCostsWithoutRub(ds, costing, filters.order).map((s) => ({ cost: s.cost, share: { rub: null, pct: null, shipmentId: s.shipmentId } })),
+      ]
+      : [];
+    const keep = (c: Cost) => [c]
       .filter((c) => !filters.shipment || costShipmentId(ds, c) === filters.shipment)
       .filter((c) => !filters.costType || c.costType === filters.costType)
       .filter((c) => !filters.status || c.status === filters.status)
       .filter((c) => !filters.from || costDate(c) >= filters.from)
-      .filter((c) => !filters.to || costDate(c) <= filters.to)
-      .sort((a, b) => (costDate(a) < costDate(b) ? 1 : costDate(a) > costDate(b) ? -1 : 0));
-  }, [ds, filters]);
+      .filter((c) => !filters.to || costDate(c) <= filters.to).length > 0;
+    return [...direct, ...shares]
+      .filter((r) => keep(r.cost))
+      .sort((a, b) => (costDate(a.cost) < costDate(b.cost) ? 1 : costDate(a.cost) > costDate(b.cost) ? -1 : 0));
+  }, [ds, costing, filters]);
 
   const totals = useMemo(() => {
     let plan = 0;
     let fact = 0;
     let missing = 0;
-    for (const c of rows) {
-      const rub = rubById.get(c.id)?.rub;
+    for (const { cost: c, share } of rows) {
+      const rub = share ? share.rub : rubById.get(c.id)?.rub;   // доля без рублей — в «без курса»
       if (rub === null || rub === undefined) { missing++; continue; }
       if (c.status === 'plan') plan += rub;
       else fact += rub;
@@ -59,26 +75,41 @@ export default function CostsScreen() {
     return { plan, fact, missing };
   }, [rows, rubById]);
 
-  const columns: DataColumn<Cost>[] = useMemo(() => [
-    { key: 'entryDate', header: 'Дата заполнения', render: (c) => ruDate(c.entryDate) },
-    { key: 'paymentDate', header: 'Дата оплаты', render: (c) => ruDate(c.paymentDate) },
+  const columns: DataColumn<Row>[] = useMemo(() => [
+    { key: 'code', header: 'Номер', render: ({ cost: c }) => c.code ?? '' },
+    { key: 'entryDate', header: 'Дата заполнения', render: ({ cost: c }) => ruDate(c.entryDate) },
+    { key: 'paymentDate', header: 'Дата оплаты', render: ({ cost: c }) => ruDate(c.paymentDate) },
     {
       key: 'status', header: 'Статус',
-      render: (c) => <span className={`tag tag--${c.status}`}>{c.status === 'plan' ? 'план' : 'факт'}</span>,
+      render: ({ cost: c }) => <span className={`tag tag--${c.status}`}>{c.status === 'plan' ? 'план' : 'факт'}</span>,
     },
-    { key: 'target', header: 'Привязка', render: (c) => targetLabel(ds, c.targetType, c.targetId) },
-    { key: 'costType', header: 'Тип', render: (c) => c.costType },
-    { key: 'payee', header: 'Кому платим', render: (c) => payeeLabel(ds, c) },
-    { key: 'executor', header: 'Исполнитель', render: (c) => c.executor ?? '' },
+    {
+      key: 'target', header: 'Привязка',
+      render: ({ cost: c, share }) => {
+        if (!share) return targetLabel(ds, c.targetType, c.targetId);
+        const sh = ds.shipments.find((x) => x.id === share.shipmentId);
+        return (
+          <span className="cost-share">
+            доля поставки {sh?.number ?? '?'}
+            <span className="rate-cell__src">
+              {share.pct === null ? 'нет курса — доля не посчитана' : `${formatSharePct(share.pct)} от ${formatMoney(rubById.get(c.id)?.rub)} ₽`} · {targetLabel(ds, c.targetType, c.targetId)}
+            </span>
+          </span>
+        );
+      },
+    },
+    { key: 'costType', header: 'Тип', render: ({ cost: c }) => c.costType },
+    { key: 'payee', header: 'Кому платим', render: ({ cost: c }) => payeeLabel(ds, c) },
+    { key: 'executor', header: 'Исполнитель', render: ({ cost: c }) => c.executor ?? '' },
     {
       key: 'invoice', header: 'Счёт',
-      render: (c) => [c.invoiceNumber, c.invoiceDate ? `от ${ruDate(c.invoiceDate)}` : ''].filter(Boolean).join(' '),
+      render: ({ cost: c }) => [c.invoiceNumber, c.invoiceDate ? `от ${ruDate(c.invoiceDate)}` : ''].filter(Boolean).join(' '),
     },
-    { key: 'amount', header: 'Сумма', align: 'right', render: (c) => <span className="num">{formatMoney(c.amount)}</span> },
-    { key: 'currency', header: 'Валюта', render: (c) => CURRENCY_LABEL[c.currency] ?? c.currency },
+    { key: 'amount', header: 'Сумма', align: 'right', render: ({ cost: c }) => <span className="num">{formatMoney(c.amount)}</span> },
+    { key: 'currency', header: 'Валюта', render: ({ cost: c }) => CURRENCY_LABEL[c.currency] ?? c.currency },
     {
       key: 'rate', header: 'Курс', align: 'right',
-      render: (c) => {
+      render: ({ cost: c }) => {
         if (c.currency === 'RUB') return <span className="num">1</span>;
         const r = rubById.get(c.id)?.rate;
         if (!r) return <span className="rate-note rate-note--warn">нет курса</span>;
@@ -96,12 +127,13 @@ export default function CostsScreen() {
     },
     {
       key: 'rub', header: 'Сумма, ₽', align: 'right',
-      render: (c) => {
+      render: ({ cost: c, share }) => {
+        if (share) return share.rub === null ? <span className="muted">—</span> : <span className="num" data-testid="share-rub">{formatMoney(share.rub)}</span>;
         const rub = rubById.get(c.id)?.rub;
         return rub === null || rub === undefined ? <span className="muted">—</span> : <span className="num">{formatMoney(rub)}</span>;
       },
     },
-    { key: 'comment', header: 'Комментарий', render: (c) => c.comment ?? '' },
+    { key: 'comment', header: 'Комментарий', render: ({ cost: c }) => c.comment ?? '' },
   ], [ds, rubById]);
 
   const editing = open?.mode === 'edit' ? ds.costs.find((c) => c.id === open.id) : undefined;
@@ -148,15 +180,15 @@ export default function CostsScreen() {
             <button type="button" className="btn btn--primary" onClick={() => setOpen({ mode: 'new' })}>Добавить затрату</button>
           </div>
           <p className="muted small">
-            Период — по дате оплаты, у плановых без даты оплаты — по дате заполнения. Фильтр заказа — затраты на заказ, его поставщиков и позиции.
+            Период — по дате оплаты, у плановых без даты оплаты — по дате заполнения. Фильтр заказа — затраты на заказ, его поставщиков и позиции, а также доли затрат поставок, в которых едут его товары (в рублях этого заказа; итог — с долями).
           </p>
           <DataTable
-            columns={columns} rows={rows} rowKey={(c) => c.id}
-            onRowClick={(c) => setOpen({ mode: 'edit', id: c.id })}
+            columns={columns} rows={rows} rowKey={(r) => (r.share ? `share:${r.cost.id}` : r.cost.id)}
+            onRowClick={(r) => setOpen({ mode: 'edit', id: r.cost.id })}
             empty="По фильтрам ничего не найдено"
             footer={(
               <tr>
-                <td colSpan={11} style={{ textAlign: 'right' }}>
+                <td colSpan={12} style={{ textAlign: 'right' }}>
                   Итого: факт <span className="num">{formatMoney(totals.fact)}</span> ₽ · план <span className="num">{formatMoney(totals.plan)}</span> ₽
                   {totals.missing > 0 ? <span className="rate-note rate-note--warn"> · без курса: {totals.missing}</span> : null}
                 </td>

@@ -3,6 +3,7 @@
 import type { CoefSuggestion } from '../../../domain/costing';
 import type { Dataset, ISODate, Order, SupplierOrder } from '../../../domain/model';
 import { formatNumber } from '../../format';
+import { formatOrderCode, orderLabel, ORDER_LETTER, parseOrderCode, yearOf } from '../../../domain/numbering';
 
 // ---------- номера и коды ----------
 
@@ -11,19 +12,39 @@ export function nextOrderNumber(orders: Pick<Order, 'number'>[]): number {
   return orders.reduce((m, o) => (Number.isFinite(o.number) ? Math.max(m, o.number) : m), 0) + 1;
 }
 
-/** Код поставщика в заказе: «15-1». */
-export const supplierOrderCode = (order: Pick<Order, 'number'>, so: Pick<SupplierOrder, 'seq'>): string => `${order.number}-${so.seq}`;
+/** Код поставщика в заказе: «З-2026-041-1», у старого заказа — «15-1». */
+export const supplierOrderCode = (order: Pick<Order, 'number' | 'code'>, so: Pick<SupplierOrder, 'seq'>): string => `${orderLabel(order)}-${so.seq}`;
+
+export const ORDER_NUMBER_FORMAT_ERROR = 'Номер заказа — З-ГГГГ-NNN или целое число';
+
+/**
+ * Номер из поля «Номер заказа» (G33): `З-ГГГГ-NNN` — код и NNN; целое число — у нового заказа и заказа с кодом NNN номера
+ * года даты заказа, у старого заказа без кода — прежний номер без кода. Иначе — текст ошибки.
+ */
+export function readOrderNumber(text: string, date: ISODate | undefined, legacy: boolean): { number: number; code?: string } | { error: string } {
+  const t = text.trim();
+  const parsed = parseOrderCode(t);
+  if (parsed) return parsed.number > 0 ? { number: parsed.number, code: `${ORDER_LETTER}-${parsed.year}-${parsed.part}` } : { error: ORDER_NUMBER_FORMAT_ERROR };
+  if (!/^\d+$/.test(t) || Number(t) <= 0) return { error: t === '' ? 'Введите номер заказа' : ORDER_NUMBER_FORMAT_ERROR };
+  const n = Number(t);
+  if (legacy) return { number: n };
+  const year = yearOf(date);
+  return year === undefined ? { error: 'Укажите дату заказа' } : { number: n, code: formatOrderCode(year, n) };
+}
 
 // ---------- поиск ----------
 
 const norm = (s: string | undefined): string => (s ?? '').trim().toLowerCase().replace(/ё/g, 'е');
 
-/** Заказы, подходящие под запрос: по номеру, заказчику, названию и ID задачи Битрикс (заказа или его поставщиков). */
+/** Заказы, подходящие под запрос: по номеру (и коду З-ГГГГ-NNN), заказчику, названию и ID задачи Битрикс (заказа или его поставщиков). */
 export function filterOrders(ds: Pick<Dataset, 'orders' | 'supplierOrders'>, query: string): Order[] {
   const q = norm(query.replace(/^\s*№\s*/, ''));
   if (q === '') return ds.orders;
   return ds.orders.filter((o) => {
     if (String(o.number).startsWith(q)) return true;
+    // по коду: с начала («з-2026») или по части с дефисом («2026-041»)
+    const code = norm(o.code);
+    if (code !== '' && (code.startsWith(q) || (q.includes('-') && code.includes(q)))) return true;
     if (norm(o.customer).includes(q) || norm(o.title).includes(q)) return true;
     if (norm(o.bitrixTaskId).includes(q)) return true;
     return ds.supplierOrders.some((so) => so.orderId === o.id && norm(so.bitrixTaskId).includes(q));

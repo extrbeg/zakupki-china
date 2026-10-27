@@ -40,7 +40,7 @@ export function separatorForLocale(locale: string | undefined): FormulaSeparator
 /** Префикс id новой записи по сущности — те же, что у форм приложения. */
 export const ID_PREFIX: Record<EntityName, string> = {
   rates: 'r', lists: 'lst', countries: 'cnt', provinces: 'prv', cities: 'city', suppliers: 'sup', agents: 'agt', carriers: 'car',
-  orders: 'ord', supplierOrders: 'so', lines: 'ln', shipments: 'shp', batches: 'bat', declarations: 'dec', costs: 'cst',
+  orders: 'ord', supplierOrders: 'so', lines: 'ln', shipmentTypes: 'stp', shipments: 'shp', batches: 'bat', declarations: 'dec', costs: 'cst',
 };
 
 /** Любая ошибка слоя Google → StoreError нужного вида (для баннера в интерфейсе). */

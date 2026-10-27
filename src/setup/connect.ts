@@ -7,9 +7,12 @@ import { createSheetsApi } from '../google/sheetsApi';
 import { GoogleApiError } from '../google/errors';
 import type { PickOptions } from '../google/picker';
 import { toStoreError } from '../store/sheetsStore';
+import { sheetFor, toRow } from '../store/schema';
+import { a1 } from '../google/a1';
 import { getBinding, setBinding } from './binding';
 import { ensureSchema, NotAppSpreadsheetError, type SchemaReport } from './ensureSchema';
 import { ensureGeography } from './geography';
+import { ensureCodes } from './codes';
 import { syncFormulaSeparator, type SeparatorState } from './formulaSeparator';
 import { installScript, readMeta, SCRIPT_VERSION, type ScriptDeps, type ScriptInstallResult } from './installScript';
 
@@ -26,9 +29,29 @@ export function googleSheetsApi(): SheetsApi {
   return defaultApi;
 }
 
+export const CODES_FAILED_TEXT = 'Не удалось проставить номера затрат и типы поставок — повтор при следующем входе';
+
+/**
+ * Типы поставок и номера затрат (G29, G33) — один раз. Сбой не мешает работе: пишется строкой в «Лог»
+ * (лог недоступен — console.warn), без метки в «_meta» следующий вход повторит.
+ */
+async function ensureCodesQuietly(api: SheetsApi, spreadsheetId: string): Promise<void> {
+  try {
+    await ensureCodes(api, spreadsheetId);
+  } catch (e) {
+    const details = e instanceof Error ? e.message : String(e);
+    try {
+      const log = sheetFor('log');
+      await api.append(spreadsheetId, a1(log.sheet, 'A1'), [toRow(log, { time: new Date().toISOString(), level: 'WARN', message: CODES_FAILED_TEXT, details })]);
+    } catch {
+      console.warn(`${CODES_FAILED_TEXT}: ${details}`);
+    }
+  }
+}
+
 export interface BindResult { spreadsheetId: string; schema: SchemaReport; script: ScriptInstallResult; formulaSeparator: SeparatorState }
 
-/** Привести таблицу к схеме, внести справочник Китая (G20), разделитель формул по локали (G27), поставить скрипт и запомнить привязку. Чужая таблица — NotAppSpreadsheetError; ошибки таблицы — StoreError; сбой скрипта — в результате. */
+/** Привести таблицу к схеме, внести справочник Китая (G20), разделитель формул по локали (G27), типы поставок и номера затрат (G29, G33), поставить скрипт и запомнить привязку. Чужая таблица — NotAppSpreadsheetError; ошибки таблицы — StoreError; сбой скрипта — в результате. */
 export async function bindSpreadsheet(api: SheetsApi, email: string, spreadsheetId: string, deps?: ScriptDeps): Promise<BindResult> {
   let schema: SchemaReport;
   let formulaSeparator: SeparatorState;
@@ -40,6 +63,7 @@ export async function bindSpreadsheet(api: SheetsApi, email: string, spreadsheet
     if (e instanceof NotAppSpreadsheetError) throw e;   // отказ с текстом — показать как есть
     throw toStoreError(e);
   }
+  await ensureCodesQuietly(api, spreadsheetId);
   setBinding(email, spreadsheetId);
   const script = await installScript(api, spreadsheetId, deps);
   return { spreadsheetId, schema, script, formulaSeparator };
@@ -74,6 +98,7 @@ export async function restoreBinding(api: SheetsApi, email: string, deps?: Scrip
     }
     throw toStoreError(e);
   }
+  await ensureCodesQuietly(api, spreadsheetId);
   try {
     await syncFormulaSeparator(api, spreadsheetId);
   } catch { /* не мешает работе — без отметки в «_meta» следующий вход повторит */ }

@@ -139,7 +139,7 @@ describe('mapLegacy — поставки', () => {
     const { data } = plan();
     expect(data.shipments).toHaveLength(1);
     const sh = data.shipments![0];
-    expect(sh).toMatchObject({ number: '1-1', mode: 'other', consolidationDate: '2026-04-15', sentDate: '2026-04-20', arrivalDate: '2026-05-25', vatRate: 22 });
+    expect(sh).toMatchObject({ number: '1-1', mode: 'other', typeId: 'stp_groupage', consolidationDate: '2026-04-15', sentDate: '2026-04-20', arrivalDate: '2026-05-25', vatRate: 22 });
     const o1 = orderBy(data.orders, 1)!;
     const alphaLines = (data.lines ?? []).filter((l) => l.orderId === o1.id && l.purchased);
     expect(data.batches?.map((b) => [b.shipmentId, b.lineId, b.qty, b.cbm, b.weight]).sort()).toEqual(
@@ -163,6 +163,16 @@ describe('mapLegacy — затраты', () => {
     expect(costs.find((c) => c.costType === 'Комиссия банка')).toMatchObject({ status: 'fact', amount: 500, currency: 'RUB', amountRub: 500, rateManual: false });
     // без даты операции — ещё не оплачена: план, дата заполнения — день импорта
     expect(costs.find((c) => c.costType === 'Доставка')).toMatchObject({ status: 'plan', entryDate: TODAY, invoiceNumber: '812', amount: 3000, currency: 'RUB' });
+  });
+
+  it('G33: затраты получают номера Р-ГГГГ-<номер заказа>-NNN по порядку дат; заказы сохраняют свой номер без кода', () => {
+    const { data } = plan();
+    const o1 = orderBy(data.orders, 1)!;
+    expect(o1.code).toBeUndefined();
+    const code = (type: string) => data.costs?.find((c) => c.targetId === o1.id && c.costType === type)?.code;
+    expect([code('Аванс'), code('Комиссия банка'), code('Доставка')]).toEqual(['Р-2026-1-001', 'Р-2026-1-002', 'Р-2026-1-003']);
+    const o = orderBy(data.orders, 46039)!;
+    expect(data.costs?.find((c) => c.targetId === o.id)?.code).toBe('Р-2026-46039-001');
   });
 
   it('номер заказа-дата в затратах находит тот же заказ; неизвестный номер и пустой — пропущены с проблемой', () => {

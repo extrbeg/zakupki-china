@@ -132,3 +132,10 @@
 .table.lines-table .coef-input.ad-own { padding: 2px 5px; border-radius: var(--radius); }
 .table.lines-table .coef-input::placeholder { color: var(--c-muted); opacity: 0.8; }
 .coef-error { font-size: 0.72rem; white-space: normal; max-width: 5rem; text-align: right; margin-left: auto; }
+/* Поставки в карточке заказа. */
+.ord-ship { border: 1px solid var(--c-border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 12px; }
+.ord-ship__head { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: baseline; margin-bottom: 8px; }
+.ord-ship__head h3 { margin: 0; font-size: 1.02rem; }
+.ord-ship__meta { color: var(--c-muted); font-size: 0.9rem; }
+.ord-ship__share { margin: 8px 0 0; font-size: 0.9rem; }
+.ord-ship__share ul { margin: 4px 0 0; padding-left: 20px; }

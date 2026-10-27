@@ -1,8 +1,11 @@
-// Партии поставки: таблица с себестоимостью единицы и форма добавления/правки (истории 14, 38, 46).
+// «Что едет» (история 101): партии поставки по группам заказ → поставщик → товар, с себестоимостью единицы и итогами поставки;
+// «Добавить из заказа» — товары заказа с остатком; форма добавления/правки одной партии (истории 14, 38, 46).
 
+import { Link } from 'react-router-dom';
+import { compareOrders, orderRef } from '../../../domain/numbering';
 import { useMemo, useState } from 'react';
 import { newId } from '../../../domain/ids';
-import type { Batch, Line, Shipment } from '../../../domain/model';
+import type { Batch, Dataset, Line, Order, Shipment } from '../../../domain/model';
 import { validateBatchQty } from '../../../domain/validation';
 import { useData } from '../../DataContext';
 import { ConfirmDelete, ErrorBanner, FormGrid, NumberField, SelectField, TextField, isBadNumber, type DataColumn } from '../../components';
@@ -10,6 +13,7 @@ import { cleanRecord } from '../../directories/records';
 import { formatMoney, formatQty } from '../../format';
 import { lineChoices, proportionalDefaults, shippedQty } from './shipmentLogic';
 import { batchTitle } from './ShipmentWarnings';
+import { SendToShipment, type SendResult } from './SendToShipment';
 
 const lineName = (line: Line | undefined) => line?.customerName || line?.docName || line?.supplierName || `позиция ${line?.seq ?? '?'}`;
 
@@ -111,16 +115,43 @@ function BatchForm({ shipment, batch, onDone }: FormProps) {
   );
 }
 
+/** Партии поставки по группам: заказ → поставщик → товар (по номеру заказа, поставщика в заказе, позиции). */
+function groupBatches(ds: Dataset, batches: Batch[]) {
+  const info = batches.map((b) => {
+    const line = ds.lines.find((l) => l.id === b.lineId);
+    const order = ds.orders.find((o) => o.id === line?.orderId);
+    const so = ds.supplierOrders.find((s) => s.id === line?.supplierOrderId);
+    const supplier = ds.suppliers.find((s) => s.id === so?.supplierId)?.name ?? line?.supplierName ?? '';
+    return { b, line, order, so, supplier };
+  });
+  info.sort((x, y) => (x.order && y.order ? compareOrders(x.order, y.order) : (x.order ? 0 : 1) - (y.order ? 0 : 1))
+    || (x.so?.seq ?? 0) - (y.so?.seq ?? 0) || (x.line?.seq ?? 0) - (y.line?.seq ?? 0));
+  const groups: { key: string; order: Order | undefined; suppliers: { key: string; name: string; items: typeof info }[] }[] = [];
+  for (const it of info) {
+    const okey = it.order?.id ?? '?';
+    let g = groups.find((x) => x.key === okey);
+    if (!g) { g = { key: okey, order: it.order, suppliers: [] }; groups.push(g); }
+    const skey = it.so?.id ?? '?';
+    let sg = g.suppliers.find((x) => x.key === skey);
+    if (!sg) { sg = { key: skey, name: it.supplier, items: [] }; g.suppliers.push(sg); }
+    sg.items.push(it);
+  }
+  return groups;
+}
+
 export function BatchesSection({ shipment, highlightId }: { shipment: Shipment; highlightId?: string }) {
   const data = useData();
   const { ds, costing } = data;
   const [editId, setEditId] = useState<string | undefined>(undefined);
   const [formKey, setFormKey] = useState(0);
   const [rowError, setRowError] = useState<unknown>(undefined);
+  const [adding, setAdding] = useState(false);
+  const [done, setDone] = useState<SendResult | undefined>(undefined);
 
   const rows = ds.batches.filter((b) => b.shipmentId === shipment.id);
   const decls = ds.declarations.filter((d) => d.shipmentId === shipment.id);
   const editing = rows.find((b) => b.id === editId);
+  const groups = groupBatches(ds, rows);
 
   const run = async (fn: () => Promise<void>) => {
     setRowError(undefined);
@@ -134,21 +165,12 @@ export function BatchesSection({ shipment, highlightId }: { shipment: Shipment; 
     await data.save('batches', next);
   });
 
+  /** CBM, вес, места партии: свои или доля позиции пропорционально количеству (как считает движок). */
+  const measure = (b: Batch, k: 'cbm' | 'weight' | 'places') => b[k] ?? proportionalDefaults(ds.lines.find((l) => l.id === b.lineId), b.qty)[k];
+  const sum = (k: 'cbm' | 'weight' | 'places') => rows.reduce((s, b) => s + (measure(b, k) ?? 0), 0);
+
   const columns: DataColumn<Batch>[] = [
-    {
-      key: 'order', header: 'Заказ', render: (b) => {
-        const line = ds.lines.find((l) => l.id === b.lineId);
-        return ds.orders.find((o) => o.id === line?.orderId)?.number ?? '';
-      },
-    },
-    {
-      key: 'supplier', header: 'Поставщик', render: (b) => {
-        const line = ds.lines.find((l) => l.id === b.lineId);
-        const so = ds.supplierOrders.find((s) => s.id === line?.supplierOrderId);
-        return ds.suppliers.find((s) => s.id === so?.supplierId)?.name ?? '';
-      },
-    },
-    { key: 'line', header: 'Позиция', render: (b) => lineName(ds.lines.find((l) => l.id === b.lineId)) },
+    { key: 'line', header: 'Товар', render: (b) => lineName(ds.lines.find((l) => l.id === b.lineId)) },
     { key: 'qty', header: 'Кол-во', align: 'right', render: (b) => formatQty(b.qty) },
     ...(['cbm', 'weight', 'places'] as const).map((k): DataColumn<Batch> => ({
       key: k, header: k === 'cbm' ? 'CBM' : k === 'weight' ? 'Вес, кг' : 'Мест', align: 'right',
@@ -170,11 +192,11 @@ export function BatchesSection({ shipment, highlightId }: { shipment: Shipment; 
       ),
     },
     {
-      key: 'unit', header: 'Себестоимость ед., ₽', align: 'right',
+      key: 'unit', header: 'Себест. ед., ₽', align: 'right',
       render: (b) => <span data-testid="unit-cost">{formatMoney(costing.batches.find((x) => x.batchId === b.id)?.unitCost)}</span>,
     },
     {
-      key: 'avg', header: 'Средняя по позиции, ₽', align: 'right',
+      key: 'avg', header: 'Средняя по товару, ₽', align: 'right',
       render: (b) => <span data-testid="line-avg-cost">{formatMoney(costing.lines.find((x) => x.lineId === b.lineId)?.AV)}</span>,
     },
     {
@@ -189,31 +211,61 @@ export function BatchesSection({ shipment, highlightId }: { shipment: Shipment; 
       ),
     },
   ];
+  const n = columns.length;
 
   return (
     <section className="ui-card" aria-labelledby="ship-batches-title">
-      <h2 className="ui-card__title" id="ship-batches-title">Партии</h2>
+      <div className="ship-head">
+        <h2 className="ui-card__title" id="ship-batches-title">Что едет</h2>
+        {adding ? null : (
+          <button type="button" className="btn btn--primary" onClick={() => { setAdding(true); setDone(undefined); }}>Добавить из заказа</button>
+        )}
+      </div>
+      {done ? <p className="ship-done" role="status">Добавлено товаров: {done.count}.</p> : null}
+      {adding ? (
+        <SendToShipment shipment={shipment} onClose={() => setAdding(false)} onDone={(r) => { setAdding(false); setDone(r); }} />
+      ) : null}
       {rowError !== undefined ? <ErrorBanner error={rowError} /> : null}
       {rows.length === 0 ? (
-        <p className="ship-muted">В поставке пока нет партий.</p>
+        <p className="ship-muted">В поставке пока нет товаров — добавьте их из заказа или по одной партии ниже.</p>
       ) : (
-        // Своя таблица (а не DataTable): строке нужны id и пометка для перехода по ссылке из предупреждения.
+        // Своя таблица (а не DataTable): строке нужны id и пометка для перехода по ссылке из предупреждения, группам — свои строки.
         <div className="table-scroll">
-          <table className="table">
+          <table className="table ship-what">
             <thead>
               <tr>{columns.map((c) => <th key={c.key} scope="col" style={{ textAlign: c.align }}>{c.header}</th>)}</tr>
             </thead>
-            <tbody>
-              {rows.map((b) => (
-                <tr
-                  key={b.id} id={`batch-${b.id}`} data-testid={`batch-row-${b.id}`}
-                  data-highlight={highlightId === b.id ? 'true' : undefined}
-                  className={highlightId === b.id ? 'ship-row--highlight' : undefined}
-                >
-                  {columns.map((c) => <td key={c.key} style={{ textAlign: c.align }}>{c.render(b)}</td>)}
+            {groups.map((g) => (
+              <tbody key={g.key}>
+                <tr className="ship-group">
+                  <th scope="rowgroup" colSpan={n}>
+                    {g.order ? <>Заказ <Link to={`/orders/${g.order.id}`}>{orderRef(g.order)}</Link>{g.order.customer ? ` · ${g.order.customer}` : ''}{g.order.title ? ` · ${g.order.title}` : ''}</> : 'Заказ не найден'}
+                  </th>
                 </tr>
-              ))}
-            </tbody>
+                {g.suppliers.map((sg) => [
+                  <tr key={`s-${sg.key}`} className="ship-subgroup"><td colSpan={n}>Поставщик: {sg.name || '—'}</td></tr>,
+                  ...sg.items.map(({ b }) => (
+                    <tr
+                      key={b.id} id={`batch-${b.id}`} data-testid={`batch-row-${b.id}`}
+                      data-highlight={highlightId === b.id ? 'true' : undefined}
+                      className={highlightId === b.id ? 'ship-row--highlight' : undefined}
+                    >
+                      {columns.map((c) => <td key={c.key} className={c.key === 'line' ? 'ship-item-name' : undefined} style={{ textAlign: c.align }}>{c.render(b)}</td>)}
+                    </tr>
+                  )),
+                ])}
+              </tbody>
+            ))}
+            <tfoot>
+              <tr className="ship-totals" data-testid="shipment-totals">
+                <td>Итого по поставке: заказов {groups.length}, партий {rows.length}</td>
+                <td />
+                <td style={{ textAlign: 'right' }} data-testid="total-cbm">{formatQty(Math.round(sum('cbm') * 10000) / 10000)}</td>
+                <td style={{ textAlign: 'right' }} data-testid="total-weight">{formatQty(sum('weight'))}</td>
+                <td style={{ textAlign: 'right' }} data-testid="total-places">{formatQty(sum('places'))}</td>
+                <td colSpan={n - 5} />
+              </tr>
+            </tfoot>
           </table>
         </div>
       )}

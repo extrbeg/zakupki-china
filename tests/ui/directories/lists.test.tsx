@@ -21,7 +21,7 @@ describe('экран «Списки»', () => {
     renderAt('/lists', { lists });
     await screen.findByRole('heading', { name: 'Списки' });
     const titles = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'));
-    expect(titles).toEqual(['Плательщики', 'Подразделения', 'Заказчики', 'Типы затрат', 'Типы компании', 'Направления', 'Специализации', 'Условия оплаты']);
+    expect(titles).toEqual(['Плательщики', 'Подразделения', 'Заказчики', 'Типы затрат', 'Типы компании', 'Направления', 'Специализации', 'Условия оплаты', 'Типы поставки']);
     expect(values('Плательщики')).toEqual(['ООО Альфа', 'ООО Бета', 'ООО Гамма']);
   });
 
@@ -79,5 +79,63 @@ describe('экран «Списки»', () => {
     fireEvent.click(within(section('Плательщики')).getByRole('button', { name: 'Удалить: ООО Бета' }));
     await waitFor(async () => expect(await stored(store, 'payer')).toEqual(['ООО Альфа', 'ООО Гамма']));
     expect(await stored(store, 'department')).toEqual(['Цех']);
+  });
+});
+
+describe('«Списки» → «Типы поставки» (G29)', () => {
+  const types = [{ id: 't1', name: 'Море, контейнер', basis: 'cbm' as const }, { id: 't2', name: 'Авиа', basis: 'weight' as const }];
+  const shipments = [{ id: 'sh1', number: 'П-2026-001', mode: 'sea_container' as const, vatRate: 22, typeId: 't1' }];
+  const typeNames = () => within(section('Типы поставки')).getAllByRole('textbox')
+    .filter((i) => (i as HTMLInputElement).dataset.role === 'value').map((i) => (i as HTMLInputElement).value);
+
+  it('типы с правилом деления доставки; пустой справочник — заранее заведённые', async () => {
+    renderAt('/lists', { lists, shipmentTypes: types });
+    await screen.findByRole('heading', { name: 'Списки' });
+    expect(typeNames()).toEqual(['Море, контейнер', 'Авиа']);
+    expect((within(section('Типы поставки')).getByLabelText('Делить доставку: Авиа') as HTMLSelectElement).value).toBe('weight');
+  });
+
+  it('пустой справочник показывает заранее заведённые типы', async () => {
+    renderAt('/lists', { lists });
+    await screen.findByRole('heading', { name: 'Списки' });
+    expect(typeNames()).toEqual(['Море, контейнер', 'Авто, контейнер', 'Ж/д, контейнер', 'Авиа', 'Авто, сборный груз']);
+  });
+
+  it('добавление с правилом, переименование и смена правила', async () => {
+    const { store } = renderAt('/lists', { lists, shipmentTypes: types });
+    await screen.findByRole('heading', { name: 'Списки' });
+    const s = within(section('Типы поставки'));
+    fireEvent.change(s.getByLabelText('Новый тип поставки'), { target: { value: 'Ж/д, контейнер' } });
+    fireEvent.change(s.getByLabelText('Делить доставку'), { target: { value: 'cbm' } });
+    fireEvent.click(s.getByRole('button', { name: 'Добавить' }));
+    await waitFor(async () => expect((await store.load()).shipmentTypes.map((t) => [t.name, t.basis])).toContainEqual(['Ж/д, контейнер', 'cbm']));
+
+    const input = s.getByLabelText('Тип поставки: Авиа');
+    fireEvent.change(input, { target: { value: 'Авиа-экспресс' } });
+    fireEvent.blur(input);
+    await waitFor(async () => expect((await store.load()).shipmentTypes.find((t) => t.id === 't2')?.name).toBe('Авиа-экспресс'));
+    fireEvent.change(s.getByLabelText('Делить доставку: Море, контейнер'), { target: { value: 'weight' } });
+    await waitFor(async () => expect((await store.load()).shipmentTypes.find((t) => t.id === 't1')?.basis).toBe('weight'));
+  });
+
+  it('дубль названия — ошибка, ничего не пишется', async () => {
+    const { store } = renderAt('/lists', { lists, shipmentTypes: types });
+    await screen.findByRole('heading', { name: 'Списки' });
+    const s = within(section('Типы поставки'));
+    fireEvent.change(s.getByLabelText('Новый тип поставки'), { target: { value: ' авиа ' } });
+    fireEvent.click(s.getByRole('button', { name: 'Добавить' }));
+    expect(await s.findByText('Такой тип уже есть')).toBeTruthy();
+    expect((await store.load()).shipmentTypes).toHaveLength(2);
+  });
+
+  it('тип, который используется в поставках, не удаляется; неиспользуемый — удаляется', async () => {
+    const { store } = renderAt('/lists', { lists, shipmentTypes: types, shipments });
+    await screen.findByRole('heading', { name: 'Списки' });
+    const s = within(section('Типы поставки'));
+    fireEvent.click(s.getByRole('button', { name: 'Удалить: Море, контейнер' }));
+    expect(await s.findByText('Тип используется в поставках: П-2026-001')).toBeTruthy();
+    fireEvent.click(s.getByRole('button', { name: 'Удалить: Авиа' }));
+    fireEvent.click(s.getByRole('button', { name: 'Да, удалить' }));
+    await waitFor(async () => expect((await store.load()).shipmentTypes.map((t) => t.id)).toEqual(['t1']));
   });
 });

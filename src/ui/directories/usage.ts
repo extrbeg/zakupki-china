@@ -2,12 +2,13 @@
 
 import type { Dataset } from '../../domain/model';
 import { compareRu } from './cityLookup';
+import { compareOrders, orderLabel } from '../../domain/numbering';
 
-/** Номера заказов, в которых есть поставщик, по возрастанию. */
-export function supplierOrderNumbers(ds: Pick<Dataset, 'orders' | 'supplierOrders'>, supplierId: string): number[] {
+/** Номера заказов (код З-ГГГГ-NNN, у старых — прежний номер), в которых есть поставщик, по возрастанию. */
+export function supplierOrderNumbers(ds: Pick<Dataset, 'orders' | 'supplierOrders'>, supplierId: string): string[] {
   const orderIds = new Set(ds.supplierOrders.filter((so) => so.supplierId === supplierId).map((so) => so.orderId));
-  const numbers = ds.orders.filter((o) => orderIds.has(o.id)).map((o) => o.number);
-  return [...new Set(numbers)].sort((a, b) => a - b);
+  const orders = ds.orders.filter((o) => orderIds.has(o.id)).sort(compareOrders);
+  return [...new Set(orders.map(orderLabel))];
 }
 
 /** Причина, по которой поставщика нельзя удалить; null — можно. */

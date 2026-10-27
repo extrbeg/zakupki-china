@@ -1,6 +1,7 @@
 // Синтетический набор для демо-режима. Все названия, люди и числа выдуманы и помечены «Демо».
 
 import type { Dataset, ListItem, ListKey, Rate } from '../domain/model';
+import { DEFAULT_SHIPMENT_TYPES } from '../domain/shipmentTypes';
 import { applyGeoSeed, GEO_VERSION, planGeoSeed, type GeoData } from '../data/geo';
 
 /** Справочник Китая для пустого набора. */
@@ -47,9 +48,9 @@ export function demoSeed(): Partial<Dataset> {
     agents: [{ id: 'demo_agent_1', name: 'Демо-агент по оплатам', country: 'Китай', city: 'Guangzhou', province: 'Guangdong', comment: 'демо' }],
     carriers: [{ id: 'demo_carrier_1', name: 'Демо-логистика', type: 'Экспедитор', specialization: 'Море, авто', contractSigned: true, comment: 'демо' }],
     orders: [
-      { id: 'demo_ord_1', number: 1, date: '2026-09-10', department: 'Демо-цех', payer: 'Демо-плательщик 1', customer: 'Демо-заказчик Север', title: 'Краны для демо', calcDate: '2026-09-15', costsComplete: true },
-      { id: 'demo_ord_2', number: 2, date: '2026-09-28', department: 'Демо-склад', payer: 'Демо-плательщик 2', customer: 'Демо-заказчик Юг', title: 'Кабель и арматура', calcDate: '2026-10-01', costsComplete: false },
-      { id: 'demo_ord_3', number: 3, date: '2026-10-20', department: 'Демо-цех', payer: 'Демо-плательщик 1', customer: 'Демо-заказчик Север', title: 'Новый заказ', costsComplete: false },
+      { id: 'demo_ord_1', number: 1, code: 'З-2026-001', date: '2026-09-10', department: 'Демо-цех', payer: 'Демо-плательщик 1', customer: 'Демо-заказчик Север', title: 'Краны для демо', calcDate: '2026-09-15', costsComplete: true },
+      { id: 'demo_ord_2', number: 2, code: 'З-2026-002', date: '2026-09-28', department: 'Демо-склад', payer: 'Демо-плательщик 2', customer: 'Демо-заказчик Юг', title: 'Кабель и арматура', calcDate: '2026-10-01', costsComplete: false },
+      { id: 'demo_ord_3', number: 3, code: 'З-2026-003', date: '2026-10-20', department: 'Демо-цех', payer: 'Демо-плательщик 1', customer: 'Демо-заказчик Север', title: 'Новый заказ', costsComplete: false },
     ],
     supplierOrders: [
       { id: 'demo_so_1', orderId: 'demo_ord_1', seq: 1, supplierId: 'demo_sup_1', currency: 'CNY', paymentTerms: '30/70', plannedMode: 'sea_container', launchDate: '2026-09-12', productionDays: 20, coef: 1.5 },
@@ -64,8 +65,10 @@ export function demoSeed(): Partial<Dataset> {
       { id: 'demo_ln_4', orderId: 'demo_ord_2', supplierOrderId: 'demo_so_3', seq: 1, customerName: 'Фитинг (демо)', qty: 400, unitPrice: 8.4, purchased: true, dutyRate: 7.5, weight: 95, places: 4, coef: 1.6 },   // свой AD позиции — переопределение AD поставщика (1.5)
       { id: 'demo_ln_5', orderId: 'demo_ord_3', supplierOrderId: 'demo_so_4', seq: 1, customerName: 'Задвижка DN100 (демо)', qty: 30, unitPrice: 940, purchased: false },
     ],
+    // G29: типы поставки — как в новой таблице.
+    shipmentTypes: DEFAULT_SHIPMENT_TYPES.map((t) => ({ ...t })),
     shipments: [
-      { id: 'demo_sh_1', number: 'Демо-контейнер 1', mode: 'sea_container', carrierId: 'demo_carrier_1', consolidationDate: '2026-10-05', sentDate: '2026-10-08', vatRate: 22 },
+      { id: 'demo_sh_1', number: 'П-2026-001', containerNo: 'Демо-контейнер 1', typeId: 'stp_sea', mode: 'sea_container', carrierId: 'demo_carrier_1', consolidationDate: '2026-10-05', sentDate: '2026-10-08', vatRate: 22 },
     ],
     declarations: [{ id: 'demo_decl_1', shipmentId: 'demo_sh_1', number: 'ДЕМО-0001', date: '2026-10-22' }],
     batches: [
@@ -74,12 +77,12 @@ export function demoSeed(): Partial<Dataset> {
       { id: 'demo_b_3', shipmentId: 'demo_sh_1', lineId: 'demo_ln_3', qty: 30, cbm: 1.8, weight: 720, places: 30, declarationId: 'demo_decl_1' },
     ],
     costs: [
-      { id: 'demo_cost_1', entryDate: '2026-09-12', paymentDate: '2026-09-12', status: 'fact', targetType: 'supplierOrder', targetId: 'demo_so_1', costType: 'Аванс', payeeType: 'supplier', payeeId: 'demo_sup_1', amount: 19710, currency: 'CNY', rate: 11.6, rateDate: '2026-09-12', rateManual: true, amountRub: 228636 },
-      { id: 'demo_cost_2', entryDate: '2026-10-02', paymentDate: '2026-10-02', status: 'fact', targetType: 'supplierOrder', targetId: 'demo_so_1', costType: 'Итоговый расчёт', payeeType: 'supplier', payeeId: 'demo_sup_1', amount: 45990, currency: 'CNY', rate: 11.48, rateDate: '2026-10-01', rateManual: false, amountRub: 527965.2 },
-      { id: 'demo_cost_3', entryDate: '2026-10-02', paymentDate: '2026-10-02', status: 'fact', targetType: 'supplierOrder', targetId: 'demo_so_1', costType: 'Комиссия агента', payeeType: 'agent', payeeId: 'demo_agent_1', amount: 650, currency: 'CNY', rate: 11.48, rateDate: '2026-10-01', rateManual: false, amountRub: 7462 },
-      { id: 'demo_cost_4', entryDate: '2026-10-08', status: 'plan', targetType: 'shipment', targetId: 'demo_sh_1', costType: 'Доставка', payeeType: 'carrier', payeeId: 'demo_carrier_1', amount: 3200, currency: 'USD', rateManual: false },
-      { id: 'demo_cost_5', entryDate: '2026-10-22', status: 'plan', targetType: 'declaration', targetId: 'demo_decl_1', costType: 'Растаможка/сборы', payeeType: 'text', payeeText: 'Демо-брокер', amount: 15000, currency: 'RUB', rateManual: false },
-      { id: 'demo_cost_6', entryDate: '2026-09-29', status: 'plan', targetType: 'order', targetId: 'demo_ord_2', costType: 'Предоплата 100 %', amount: 9000, currency: 'USD', rateManual: false },
+      { id: 'demo_cost_1', code: 'Р-2026-001-001', entryDate: '2026-09-12', paymentDate: '2026-09-12', status: 'fact', targetType: 'supplierOrder', targetId: 'demo_so_1', costType: 'Аванс', payeeType: 'supplier', payeeId: 'demo_sup_1', amount: 19710, currency: 'CNY', rate: 11.6, rateDate: '2026-09-12', rateManual: true, amountRub: 228636 },
+      { id: 'demo_cost_2', code: 'Р-2026-001-002', entryDate: '2026-10-02', paymentDate: '2026-10-02', status: 'fact', targetType: 'supplierOrder', targetId: 'demo_so_1', costType: 'Итоговый расчёт', payeeType: 'supplier', payeeId: 'demo_sup_1', amount: 45990, currency: 'CNY', rate: 11.48, rateDate: '2026-10-01', rateManual: false, amountRub: 527965.2 },
+      { id: 'demo_cost_3', code: 'Р-2026-001-003', entryDate: '2026-10-02', paymentDate: '2026-10-02', status: 'fact', targetType: 'supplierOrder', targetId: 'demo_so_1', costType: 'Комиссия агента', payeeType: 'agent', payeeId: 'demo_agent_1', amount: 650, currency: 'CNY', rate: 11.48, rateDate: '2026-10-01', rateManual: false, amountRub: 7462 },
+      { id: 'demo_cost_4', code: 'Р-2026-П001-001', entryDate: '2026-10-08', status: 'plan', targetType: 'shipment', targetId: 'demo_sh_1', costType: 'Доставка', payeeType: 'carrier', payeeId: 'demo_carrier_1', amount: 3200, currency: 'USD', rateManual: false },
+      { id: 'demo_cost_5', code: 'Р-2026-П001-002', entryDate: '2026-10-22', status: 'plan', targetType: 'declaration', targetId: 'demo_decl_1', costType: 'Растаможка/сборы', payeeType: 'text', payeeText: 'Демо-брокер', amount: 15000, currency: 'RUB', rateManual: false },
+      { id: 'demo_cost_6', code: 'Р-2026-002-001', entryDate: '2026-09-29', status: 'plan', targetType: 'order', targetId: 'demo_ord_2', costType: 'Предоплата 100 %', amount: 9000, currency: 'USD', rateManual: false },
     ],
   };
 }

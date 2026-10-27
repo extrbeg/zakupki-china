@@ -15,7 +15,7 @@ describe('создание заказа', () => {
   it('номер по умолчанию — следующий свободный; повтор — ошибка у поля, введённое остаётся', async () => {
     const { store } = renderAt('/orders/new', baseSeed);
     const number = (await screen.findByLabelText(/^Номер заказа/)) as HTMLInputElement;
-    expect(number.value).toBe('13');
+    expect(number.value).toBe('З-2026-013');   // G33: З-ГГГГ-NNN после старых заказов этого года (12 и 6)
     set(number, '12');
     set(screen.getByLabelText(/^Название/), 'Мой заказ');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить заказ' }));
@@ -40,6 +40,52 @@ describe('создание заказа', () => {
     await waitFor(() => expect(screen.getByTestId('where').textContent).toMatch(/^\/orders\/ord_/));
     const o = (await store.load()).orders.find((x) => x.number === 20);
     expect(o).toMatchObject({ date: '2026-10-24', department: 'Цех', payer: 'ООО Плательщик', customer: 'Заказчик Юг', title: 'Новый', bitrixTaskId: '555', comment: 'ком', costsComplete: false });
+  });
+});
+
+describe('номер заказа З-ГГГГ-NNN (G33)', () => {
+  it('новый заказ: номер следует за годом даты, пока его не правили; сохраняется кодом и NNN', async () => {
+    const { store } = renderAt('/orders/new', baseSeed);
+    const number = (await screen.findByLabelText(/^Номер заказа/)) as HTMLInputElement;
+    set(screen.getByLabelText(/^Дата заказа/), '2027-01-05');
+    expect(number.value).toBe('З-2027-001');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить заказ' }));
+    await waitFor(async () => expect((await store.load()).orders).toHaveLength(3));
+    expect((await store.load()).orders.find((o) => o.code === 'З-2027-001')).toMatchObject({ number: 1, date: '2027-01-05' });
+  });
+
+  it('целое число в новом заказе — NNN номера этого года', async () => {
+    const { store } = renderAt('/orders/new', baseSeed);
+    set(await screen.findByLabelText(/^Номер заказа/), '20');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить заказ' }));
+    await waitFor(async () => expect((await store.load()).orders).toHaveLength(3));
+    expect((await store.load()).orders.find((o) => o.number === 20)?.code).toBe('З-2026-020');
+  });
+
+  it('старый заказ без кода показывается по прежнему номеру и сохраняется без кода', async () => {
+    const { store } = renderAt('/orders/o12', baseSeed);
+    expect((await screen.findByLabelText(/^Номер заказа/) as HTMLInputElement).value).toBe('12');
+    expect(within(header()).getByText('Заказ № 12')).toBeTruthy();
+    set(screen.getByLabelText(/^Название/), 'Краны новые');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить заказ' }));
+    await waitFor(async () => expect((await store.load()).orders.find((o) => o.id === 'o12')?.title).toBe('Краны новые'));
+    expect((await store.load()).orders.find((o) => o.id === 'o12')?.code).toBeUndefined();
+  });
+
+  it('заказ с кодом: код в заголовке, у поставщика в заказе и в списке; поиск находит по коду', async () => {
+    const seed = { ...baseSeed, orders: [...baseSeed.orders!, { id: 'o41', number: 41, code: 'З-2026-041', date: '2026-10-01', title: 'Новый кодом', costsComplete: false }],
+      supplierOrders: [...baseSeed.supplierOrders!, { id: 'so41', orderId: 'o41', seq: 1, supplierId: 's2', currency: 'CNY' as const }] };
+    renderAt('/orders/o41', seed);
+    expect(await within(await screen.findByRole('region', { name: 'Шапка заказа' })).findByText('Заказ З-2026-041')).toBeTruthy();
+    expect(block('З-2026-041-1')).toBeTruthy();
+  });
+
+  it('неверный вид номера — ошибка у поля', async () => {
+    const { store } = renderAt('/orders/new', baseSeed);
+    set(await screen.findByLabelText(/^Номер заказа/), 'А-1');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить заказ' }));
+    expect(await screen.findByText('Номер заказа — З-ГГГГ-NNN или целое число')).toBeTruthy();
+    expect((await store.load()).orders).toHaveLength(2);
   });
 });
 

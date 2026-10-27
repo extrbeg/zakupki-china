@@ -3,6 +3,7 @@
 
 import type { Cost, CostTargetType, Dataset, PayeeType } from '../../../domain/model';
 import { COST_TYPES } from '../../../domain/costing';
+import { compareOrders, orderRef } from '../../../domain/numbering';
 import type { SelectOption } from '../../components';
 
 export const TARGET_TYPES: CostTargetType[] = ['order', 'supplierOrder', 'line', 'shipment', 'declaration'];
@@ -19,7 +20,7 @@ const byId = <T extends { id: string }>(list: T[], id: string | undefined): T | 
 
 function orderTitle(ds: Dataset, orderId: string): string {
   const o = byId(ds.orders, orderId);
-  return o ? `Заказ № ${o.number}` : 'Заказ ?';
+  return o ? `Заказ ${orderRef(o)}` : 'Заказ ?';
 }
 
 function supplierOrderTitle(ds: Dataset, soId: string): string {
@@ -34,7 +35,7 @@ export function targetLabel(ds: Dataset, type: CostTargetType, id: string): stri
   switch (type) {
     case 'order': {
       const o = byId(ds.orders, id);
-      return o ? `Заказ № ${o.number}${o.title ? ` — ${o.title}` : ''}` : 'Заказ ?';
+      return o ? `Заказ ${orderRef(o)}${o.title ? ` — ${o.title}` : ''}` : 'Заказ ?';
     }
     case 'supplierOrder':
       return supplierOrderTitle(ds, id);
@@ -57,22 +58,28 @@ export function targetLabel(ds: Dataset, type: CostTargetType, id: string): stri
   }
 }
 
-const orderNumber = (ds: Dataset, orderId: string) => byId(ds.orders, orderId)?.number ?? Number.MAX_SAFE_INTEGER;
+/** Порядок заказов по номеру (год, затем NNN); заказ не найден — в конец. */
+const byOrder = (ds: Dataset, a: string, b: string): number => {
+  const oa = byId(ds.orders, a);
+  const ob = byId(ds.orders, b);
+  if (!oa || !ob) return (oa ? 0 : 1) - (ob ? 0 : 1);
+  return compareOrders(oa, ob);
+};
 
 /** Варианты объекта привязки выбранного вида, по номеру заказа / поставки. */
 export function targetOptions(ds: Dataset, type: CostTargetType): SelectOption[] {
   const opt = (id: string) => ({ value: id, label: targetLabel(ds, type, id) });
   switch (type) {
     case 'order':
-      return [...ds.orders].sort((a, b) => b.number - a.number).map((o) => opt(o.id));
+      return [...ds.orders].sort((a, b) => compareOrders(b, a)).map((o) => opt(o.id));
     case 'supplierOrder':
       return [...ds.supplierOrders]
-        .sort((a, b) => orderNumber(ds, b.orderId) - orderNumber(ds, a.orderId) || a.seq - b.seq)
+        .sort((a, b) => byOrder(ds, b.orderId, a.orderId) || a.seq - b.seq)
         .map((so) => opt(so.id));
     case 'line': {
       const soSeq = (id: string) => byId(ds.supplierOrders, id)?.seq ?? 0;
       return [...ds.lines]
-        .sort((a, b) => orderNumber(ds, b.orderId) - orderNumber(ds, a.orderId) || soSeq(a.supplierOrderId) - soSeq(b.supplierOrderId) || a.seq - b.seq)
+        .sort((a, b) => byOrder(ds, b.orderId, a.orderId) || soSeq(a.supplierOrderId) - soSeq(b.supplierOrderId) || a.seq - b.seq)
         .map((l) => opt(l.id));
     }
     case 'shipment':

@@ -6,3 +6,4 @@ export { bindSpreadsheet, createAndBind, restoreBinding, googleSheetsApi, spread
 export { ensureGeography, type GeoSeedReport } from './geography';
 export { DEFAULT_COST_TYPES, DEFAULT_SETTINGS } from './defaults';
 export { syncFormulaSeparator, applyFormulaSeparator, FORMULA_SEPARATOR_OPTIONS, type SeparatorState } from './formulaSeparator';
+export { ensureCodes, CODES_VERSION, CODES_META_KEY, type CodesReport } from './codes';

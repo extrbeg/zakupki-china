@@ -1,6 +1,7 @@
 // Чистая логика экрана «Себестоимость»: строки таблицы, отклонение AW от AD, предупреждения выбора, строки отчёта.
 // Выбор заказов — только фильтр показа: движок считает всё по всем данным (R18.1).
 
+import { compareOrders, orderLabel, orderRef } from '../../../domain/numbering';
 import { AD_LABEL, AW_LABEL } from '../orders/coefLabels';
 import { COST_CATEGORIES, COST_CATEGORY_LABEL, type BatchCost, type CostCategory, type CostWarning, type CostingResult, type LineCost } from '../../../domain/costing';
 import type { Dataset, ISODate, Line, Order, Supplier, SupplierOrder } from '../../../domain/model';
@@ -45,7 +46,7 @@ export function buildRows(ds: Dataset, costing: CostingResult, selected: Readonl
       deviationPct: deviationPct(cost.AW, cost.AD),
     });
   }
-  return rows.sort((a, b) => a.order.number - b.order.number || (a.so?.seq ?? 0) - (b.so?.seq ?? 0) || a.line.seq - b.line.seq);
+  return rows.sort((a, b) => compareOrders(a.order, b.order) || (a.so?.seq ?? 0) - (b.so?.seq ?? 0) || a.line.seq - b.line.seq);
 }
 
 const zeroBreakdown = (): Record<CostCategory, number> => Object.fromEntries(COST_CATEGORIES.map((k) => [k, 0])) as Record<CostCategory, number>;
@@ -101,7 +102,7 @@ function orderIdsOf(ds: Dataset, costing: CostingResult, type: RefType, id: stri
 function linkFor(ds: Dataset, costing: CostingResult, ref: CostWarning['refs'][number]): WarningLink | null {
   const orderLink = (orderId: string): WarningLink | null => {
     const o = ds.orders.find((x) => x.id === orderId);
-    return o ? { to: `/orders/${o.id}`, label: `Заказ № ${o.number}` } : null;
+    return o ? { to: `/orders/${o.id}`, label: `Заказ ${orderRef(o)}` } : null;
   };
   const shipmentLink = (shipmentId: string): WarningLink | null => {
     const s = ds.shipments.find((x) => x.id === shipmentId);
@@ -144,7 +145,7 @@ const r2 = (n: number | null | undefined): number | null => (n === null || n ===
 
 /** Строки для `store.writeReport('Себестоимость', rows)`: шапка, таблица позиций, итог. Числа — с 2 знаками. */
 export function buildReportRows(ds: Dataset, rows: CostingRow[], selected: ReadonlySet<string>, today: ISODate): ReportRow[] {
-  const numbers = ds.orders.filter((o) => selected.has(o.id)).map((o) => o.number).sort((a, b) => a - b).join(', ');
+  const numbers = ds.orders.filter((o) => selected.has(o.id)).sort(compareOrders).map(orderLabel).join(', ');
   const header = [
     'Заказ', 'Поставщик', '№', 'Позиция', 'Кол-во', 'Цена в валюте', 'Валюта', 'Цена ₽/шт', 'Прогноз ₽/шт', AD_LABEL,
     'Себестоимость позиции, ₽', 'Себестоимость за единицу, ₽', AW_LABEL, 'Отклонение, %', 'Статус',
@@ -164,7 +165,7 @@ export function buildReportRows(ds: Dataset, rows: CostingRow[], selected: Reado
     total += c.total;
     for (const k of COST_CATEGORIES) sum[k] += c.breakdown[k];
     out.push([
-      r.order.number, r.supplier?.name ?? '', r.line.seq, lineTitle(r.line), r.line.qty, r2(r.line.unitPrice), r.so?.currency ?? '',
+      r.order.code?.trim() || r.order.number, r.supplier?.name ?? '', r.line.seq, lineTitle(r.line), r.line.qty, r2(r.line.unitPrice), r.so?.currency ?? '',
       r2(c.Y), r2(c.AB), r2(c.AD), r2(c.total), r2(c.AV), r2(c.AW), r2(r.deviationPct), c.provisional ? 'предварительно' : 'закрыт',
       ...COST_CATEGORIES.map((k) => r2(c.breakdown[k])),
     ]);

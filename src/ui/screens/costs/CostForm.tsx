@@ -4,6 +4,8 @@
 import { useMemo, useState } from 'react';
 import type { Cost, CostStatus, CostTargetType, Currency, Dataset, ISODate, PayeeType } from '../../../domain/model';
 import { newId } from '../../../domain/ids';
+import { costCodeTaken, nextCostCode } from '../../../domain/numbering';
+import { CostSplit } from './CostSplit';
 import { useData } from '../../DataContext';
 import { ConfirmDelete, DateField, DirectorySelectField, ErrorBanner, FormGrid, ListSelectField, NumberField, SelectField, TextField, isBadNumber, type DirectoryEntity } from '../../components';
 import { CURRENCY_OPTIONS, formatRate, ruDate } from '../../format';
@@ -54,6 +56,8 @@ export function CostForm({ cost, preset, onClose }: { cost?: Cost; preset?: Cost
     return cur ? { ...draft, currency: cur } : draft;
   });
   const [currencyTouched, setCurrencyTouched] = useState(Boolean(cost));
+  /** Номер правили руками (или он уже был у затраты) — он больше не следует за привязкой (G33). */
+  const [codeTouched, setCodeTouched] = useState(Boolean(cost?.code));
   const [errors, setErrors] = useState<CostErrors>({});
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<unknown>(null);
@@ -62,6 +66,8 @@ export function CostForm({ cost, preset, onClose }: { cost?: Cost; preset?: Cost
   const rate = effectiveRate(d, auto);
   const amounts = draftAmounts(d, rate);
   const note = rateNote(d, auto, today);
+  const autoCode = d.targetId ? nextCostCode(ds, { targetType: d.targetType, targetId: d.targetId, entryDate: d.entryDate ?? today, paymentDate: d.paymentDate }) : null;
+  const shownCode = codeTouched ? d.code ?? '' : autoCode ?? '';
 
   /** Смена даты оплаты или валюты: зафиксированный курс факта перестаёт действовать, ручной — остаётся. */
   const patchRateBasis = (patch: Partial<CostDraft>) =>
@@ -96,9 +102,11 @@ export function CostForm({ cost, preset, onClose }: { cost?: Cost; preset?: Cost
   };
 
   const submit = async () => {
-    const { cost: record, errors: e } = buildCost(d, auto);
+    const code = shownCode.trim() || autoCode || undefined;
+    const { cost: record, errors: e } = buildCost({ ...d, code }, auto);
+    if (code && costCodeTaken(ds.costs, { id: d.id ?? '', code })) e.code = `Номер ${code} уже есть`;
     setErrors(e);
-    if (!record) return;
+    if (!record || e.code) return;
     setBusy(true);
     setFailure(null);
     try {
@@ -132,6 +140,11 @@ export function CostForm({ cost, preset, onClose }: { cost?: Cost; preset?: Cost
       <h2 className="ui-card__title">{cost ? 'Затрата' : 'Новая затрата'}</h2>
       {failure ? <ErrorBanner error={failure} /> : null}
       <FormGrid>
+        <TextField
+          label="Номер затраты" value={shownCode} error={errors.code}
+          hint={codeTouched ? undefined : 'Присваивается сам по привязке: Р-ГГГГ-<заказ>-NNN или Р-ГГГГ-П<поставка>-NNN'}
+          onChange={(v) => { setCodeTouched(true); patch({ code: v }); }}
+        />
         <SelectField
           label="Статус" value={d.status}
           options={[{ value: 'fact', label: 'Факт (оплачено)' }, { value: 'plan', label: 'План' }]}
@@ -209,6 +222,9 @@ export function CostForm({ cost, preset, onClose }: { cost?: Cost; preset?: Cost
         />
         <TextField label="Комментарий" value={d.comment} onChange={(v) => patch({ comment: v })} multiline className="ui-card__full" />
       </FormGrid>
+      {d.targetType === 'shipment' || d.targetType === 'declaration' ? (
+        <CostSplit saved={cost} draft={{ id: d.id, entryDate: d.entryDate, targetType: d.targetType, targetId: d.targetId, costType: d.costType }} rub={amounts.amountRub} />
+      ) : null}
 
       <div className="ui-card__actions">
         <button type="submit" className="btn btn--primary" disabled={busy}>Сохранить</button>

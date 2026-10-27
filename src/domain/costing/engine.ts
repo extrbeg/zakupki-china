@@ -4,8 +4,10 @@
 // 2. Каждая затрата распределяется по партиям; неотгруженный остаток позиции — виртуальная партия `rest:<lineId>`.
 // 3. Правила распределения — по привязке затраты (таблица спецификации):
 //    поставщик в заказе — стоимость позиций в валюте; заказ — стоимость позиций в ₽ по курсу расчёта;
-//    поставка — CBM (доставка контейнером; партии без CBM — доля по весу, G01) → вес → стоимость; декларация — тамож. стоимость (× % пошлины; + пошлина для НДС);
+//    поставка — CBM (доставка поставки, чей тип делит доставку по объёму; без типа — контейнер море/авто, G29;
+//    партии без CBM — доля по весу, G01) → вес → стоимость; декларация — тамож. стоимость (× % пошлины; + пошлина для НДС);
 //    позиция — целиком на неё. Внутри позиции доля делится между её партиями по количеству.
+//    Доля каждой затраты в каждой партии — `allocations` (по ним — доли затрат по заказам, src/domain/costShares.ts).
 // 4. Себестоимость партии = сумма долей; позиции — сумма партий; AV = итог / кол-во, AW = AV / Y.
 //    AD и AB позиции — по действующему AD: свой AD позиции, иначе AD поставщика в заказе (effectiveCoef).
 // Расчёт всегда по всему набору данных: выбор заказов на экране — только фильтр показа.
@@ -15,6 +17,8 @@ import type { Batch, Cost, Currency, Dataset, ISODate, Line, Order, Shipment, Su
 import { calcRateFor, effectiveCoef, lineFigures, type LineFigures } from '../lineFigures';
 import { pickRate, type RatePick } from '../rates';
 import { ruDate } from '../format';
+import { orderRef } from '../numbering';
+import { deliveryBasis } from '../shipmentTypes';
 import { costCategory } from './costTypes';
 import {
   COST_CATEGORIES, type BatchCost, type CostCategory, type CostRub, type CostWarning, type CostingResult,
@@ -65,10 +69,16 @@ class Collector {
   }
 }
 
-function book(acc: Acc, category: CostCategory, rub: number, status: Status) {
+/** Доли затрат по партиям (G31): `costId` → `batchId` → ₽. Заполняется в `book`, наружу — `CostingResult.allocations`. */
+type AllocMap = Map<string, Map<string, number>>;
+
+function book(acc: Acc, category: CostCategory, rub: number, status: Status, alloc: AllocMap, costId: string) {
   acc.out.breakdown[category] += rub;
   acc.out.total += rub;
   if (status === 'plan') acc.plan += rub; else acc.fact += rub;
+  let byBatch = alloc.get(costId);
+  if (!byBatch) { byBatch = new Map(); alloc.set(costId, byBatch); }
+  byBatch.set(acc.out.batchId, (byBatch.get(acc.out.batchId) ?? 0) + rub);
 }
 
 /** Делит сумму пропорционально весам. false — база пустая (сумма весов не положительна). */
@@ -80,14 +90,15 @@ function spread<T>(items: { item: T; w: number }[], rub: number, put: (item: T, 
 }
 
 /** Доля позиции — по её партиям пропорционально количеству. */
-function spreadInLine(lc: LineCtx, rub: number, category: CostCategory, status: Status): boolean {
-  return spread(lc.accs.map((a) => ({ item: a, w: a.out.qty })), rub, (a, part) => book(a, category, part, status));
+function spreadInLine(lc: LineCtx, rub: number, put: (a: Acc, part: number) => void): boolean {
+  return spread(lc.accs.map((a) => ({ item: a, w: a.out.qty })), rub, put);
 }
 
 // ---------- расчёт ----------
 
 export function computeCosting(ds: Dataset, today: ISODate): CostingResult {
   const warn = new Collector();
+  const alloc: AllocMap = new Map();
   const orders = new Map(ds.orders.map((o) => [o.id, o]));
   const sos = new Map(ds.supplierOrders.map((s) => [s.id, s]));
   const shipments = new Map(ds.shipments.map((s) => [s.id, s]));
@@ -124,7 +135,7 @@ export function computeCosting(ds: Dataset, today: ISODate): CostingResult {
       const o = orders.get(so.orderId);
       warn.add({
         code: 'NO_RATE',
-        message: `Заказ № ${o?.number ?? '?'}, поставщик ${so.seq}: нет курса ${CURRENCY_LABEL[so.currency]} на дату расчёта — Y, AB и таможенная стоимость не посчитаны`,
+        message: `Заказ ${o ? orderRef(o) : '№ ?'}, поставщик ${so.seq}: нет курса ${CURRENCY_LABEL[so.currency]} на дату расчёта — Y, AB и таможенная стоимость не посчитаны`,
         refs: [{ type: 'supplierOrder', id: so.id }],
       });
     }
@@ -161,7 +172,7 @@ export function computeCosting(ds: Dataset, today: ISODate): CostingResult {
     if (shipped > lineQty) {
       warn.add({
         code: 'BATCH_OVER_QTY',
-        message: `Позиция ${line.seq} заказа № ${order?.number ?? '?'}: в партиях ${shipped} из ${lineQty} шт`,
+        message: `Позиция ${line.seq} заказа ${order ? orderRef(order) : '№ ?'}: в партиях ${shipped} из ${lineQty} шт`,
         refs: [{ type: 'line', id: line.id }],
       });
     } else if (lineQty - shipped > 0) {
@@ -237,13 +248,13 @@ export function computeCosting(ds: Dataset, today: ISODate): CostingResult {
 
   /**
    * База поставки, с предупреждениями.
-   * Доставка контейнером (море/авто): CBM у всех — по CBM; CBM ни у одной — по весу;
+   * Доставка поставки с правилом «по объёму» (тип поставки; без типа — контейнер море/авто): CBM у всех — по CBM; CBM ни у одной — по весу;
    * CBM у части (G01) — партия без CBM получает долю = её вес / общий вес партий поставки,
    * остаток делится между партиями с CBM по CBM; вес партии с CBM без веса — 1 CBM = 1000 кг (NO_WEIGHT).
    * Партия без CBM и без веса — вся поставка по стоимости. Остальное — вес → стоимость.
    */
   const shipmentWeights = (sh: Shipment, accs: Acc[], cat: CostCategory): { item: Acc; w: number }[] => {
-    const container = cat === 'delivery' && (sh.mode === 'sea_container' || sh.mode === 'road_container');
+    const container = cat === 'delivery' && deliveryBasis(ds, sh) === 'cbm';
     if (container) {
       const noCbm = accs.filter((a) => !pos(a.cbm));
       if (noCbm.length === 0) return accs.map((a) => ({ item: a, w: a.cbm! }));
@@ -289,9 +300,9 @@ export function computeCosting(ds: Dataset, today: ISODate): CostingResult {
     const status: Status = c.status === 'plan' ? 'plan' : 'fact';
     const cat = costCategory(c.costType);
     const into = bookCategory(c, cat);
-    const put = (a: Acc, part: number) => book(a, into, part, status);
+    const put = (a: Acc, part: number) => book(a, into, part, status, alloc, c.id);
     const byLines = (items: { item: LineCtx; w: number }[]) =>
-      spread(items, rub, (lc, part) => { if (!spreadInLine(lc, part, into, status)) unallocatedRub += part; });
+      spread(items, rub, (lc, part) => { if (!spreadInLine(lc, part, put)) unallocatedRub += part; });
 
     switch (c.targetType) {
       case 'supplierOrder': {
@@ -306,7 +317,7 @@ export function computeCosting(ds: Dataset, today: ISODate): CostingResult {
       }
       case 'line': {
         const lc = lineCtx.get(c.targetId);
-        if (!lc || !spreadInLine(lc, rub, into, status)) emptyBase(c, rub, 'позиция не найдена, не закупается или без количества');
+        if (!lc || !spreadInLine(lc, rub, put)) emptyBase(c, rub, 'позиция не найдена, не закупается или без количества');
         return;
       }
       case 'shipment': {
@@ -428,7 +439,7 @@ export function computeCosting(ds: Dataset, today: ISODate): CostingResult {
     }
     t.costTotal = t.planRub + t.factRub;
     if (!o.costsComplete && [...lineCtx.values()].some((lc) => lc.line.orderId === o.id)) {
-      warn.add({ code: 'NOT_COMPLETE', message: `Заказ № ${o.number}: не отмечено «Все затраты внесены» — AW предварительный`, refs: [{ type: 'order', id: o.id }] });
+      warn.add({ code: 'NOT_COMPLETE', message: `Заказ ${orderRef(o)}: не отмечено «Все затраты внесены» — AW предварительный`, refs: [{ type: 'order', id: o.id }] });
     }
     return t;
   });
@@ -436,6 +447,7 @@ export function computeCosting(ds: Dataset, today: ISODate): CostingResult {
   return {
     costsRub, batches: allAccs.map((a) => a.out), lines, orders: totals, unallocatedRub,
     warnings: warn.warnings, customsForecasts,
+    allocations: [...alloc].flatMap(([costId, byBatch]) => [...byBatch].map(([batchId, rub]) => ({ costId, batchId, rub }))),
   };
 }
 

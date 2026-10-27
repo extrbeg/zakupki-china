@@ -1,6 +1,7 @@
 // Проверки ввода. Каждая функция возвращает { поле: русский текст ошибки }; пустой объект — всё верно.
 
 import type { Batch, Dataset, Line, Order } from './model';
+import { orderRef, ordersClash } from './numbering';
 
 export type ValidationErrors = Record<string, string>;
 
@@ -33,8 +34,14 @@ export function validateBatchQty(ds: Pick<Dataset, 'lines' | 'batches'>, batch: 
   return {};
 }
 
-export function validateOrderNumberUnique(ds: Pick<Dataset, 'orders'>, order: Pick<Order, 'id' | 'number'>): ValidationErrors {
+/**
+ * Номер заказа уникален (G33): тот же код; тот же NNN в том же году (год кода, у старого заказа — даты);
+ * два старых заказа без кода — тот же номер.
+ */
+export function validateOrderNumberUnique(ds: Pick<Dataset, 'orders'>, order: Pick<Order, 'id' | 'number'> & Partial<Pick<Order, 'code' | 'date'>>): ValidationErrors {
   if (!num(order.number) || order.number <= 0 || !Number.isInteger(order.number)) return { number: 'Номер заказа — целое число больше нуля' };
-  if (ds.orders.some((o) => o.id !== order.id && o.number === order.number)) return { number: `Заказ № ${order.number} уже есть` };
+  const candidate = { number: order.number, code: order.code, date: order.date ?? '' };
+  const taken = ds.orders.find((o) => o.id !== order.id && ordersClash(o, candidate));
+  if (taken) return { number: `Заказ ${orderRef(taken)} уже есть` };
   return {};
 }

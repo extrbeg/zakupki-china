@@ -6,6 +6,7 @@ import type { Shipment } from '../../../domain/model';
 import { useData } from '../../DataContext';
 import { DataTable, EmptyState, type DataColumn } from '../../components';
 import { MODE_LABEL, formatDate } from '../../format';
+import { shipmentTypeOf } from '../../../domain/shipmentTypes';
 import './shipments.css';
 
 export default function ShipmentsScreen() {
@@ -28,7 +29,8 @@ export default function ShipmentsScreen() {
       key: 'number', header: 'Поставка',
       render: (s) => <Link to={`/shipments/${s.id}`} onClick={(e) => e.stopPropagation()}>{s.number}</Link>,
     },
-    { key: 'mode', header: 'Тип', render: (s) => MODE_LABEL[s.mode] ?? s.mode },
+    { key: 'mode', header: 'Тип', render: (s) => shipmentTypeOf(ds, s)?.name ?? MODE_LABEL[s.mode] ?? s.mode },
+    { key: 'container', header: 'Контейнер / накладная', render: (s) => s.containerNo ?? '' },
     { key: 'carrier', header: 'Перевозчик', render: (s) => ds.carriers.find((c) => c.id === s.carrierId)?.name ?? '' },
     { key: 'sent', header: 'Отправка в РФ', render: (s) => formatDate(s.sentDate) },
     { key: 'arrival', header: 'Прибытие на СВХ', render: (s) => formatDate(s.arrivalDate) },

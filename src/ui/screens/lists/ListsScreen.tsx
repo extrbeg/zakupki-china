@@ -2,6 +2,7 @@
 
 import { LIST_DEFS } from '../../directories/listDefs';
 import { ListEditor } from '../../directories/ListEditor';
+import { ShipmentTypesEditor } from '../../directories/ShipmentTypesEditor';
 import '../../directories/directories.css';
 
 export default function ListsScreen() {
@@ -12,6 +13,7 @@ export default function ListsScreen() {
         Значения предлагаются в карточках заказов, поставщиков и затрат. Переименование не меняет уже записанные заказы.
       </p>
       {LIST_DEFS.map((d) => <ListEditor key={d.key} listKey={d.key} label={d.label} />)}
+      <ShipmentTypesEditor />
     </section>
   );
 }

@@ -45,6 +45,19 @@ describe('список заказов', () => {
     expect(await screen.findByText('Ничего не найдено')).toBeTruthy();
   });
 
+  it('G33: номер — кодом, у старых — прежний; порядок — год, затем номер; поиск по коду', async () => {
+    renderAt('/', { ...baseSeed, orders: [...baseSeed.orders!, { id: 'o1', number: 1, code: 'З-2027-001', date: '2027-01-05', title: 'Январский', costsComplete: false }] });
+    await screen.findByText('Январский');
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(within(rows[0]).getByText('З-2027-001')).toBeTruthy();
+    expect(within(rows[1]).getByText('12')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/^Поиск/), { target: { value: 'з-2027' } });
+    expect(screen.queryByText('Краны')).toBeNull();
+    expect(screen.getByText('Январский')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/^Поиск/), { target: { value: '2027-001' } });
+    expect(screen.getByText('Январский')).toBeTruthy();
+  });
+
   it('строка ведёт в карточку заказа', async () => {
     renderAt('/', baseSeed);
     fireEvent.click(await screen.findByText('Краны'));

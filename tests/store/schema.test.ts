@@ -16,7 +16,7 @@ describe('SHEETS', () => {
   it('описывает все листы interfaces.md §6 в нужном порядке', () => {
     expect(SHEETS.map((s) => s.sheet)).toEqual([
       '_meta', 'Настройки', 'Лог', 'Курсы', 'Списки', 'Страны', 'Провинции', 'Города', 'Поставщики', 'Платежные агенты', 'Перевозчики',
-      'Заказы', 'Поставщики в заказе', 'Позиции', 'Поставки', 'Партии', 'Декларации', 'Затраты',
+      'Заказы', 'Поставщики в заказе', 'Позиции', 'Типы поставки', 'Поставки', 'Партии', 'Декларации', 'Затраты',
     ]);
     expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(1);
   });
@@ -32,15 +32,25 @@ describe('SHEETS', () => {
   it('заголовки — по таблице §6', () => {
     expect(sheet('orders').columns.map((c) => c.header)).toEqual([
       'id', 'Заказ', 'Дата заказа', 'Подразделение', 'Плательщик', 'Заказчик', 'Название', 'ID задачи Битрикс',
-      'Дата расчёта', 'Все затраты внесены', 'Комментарий', 'Создан',
+      'Дата расчёта', 'Все затраты внесены', 'Комментарий', 'Создан', 'Номер заказа',
     ]);
     expect(sheet('batches').columns.map((c) => c.header)).toEqual(['id', 'shipmentId', 'lineId', 'Кол-во', 'CBM', 'Вес, кг', 'Мест', 'declarationId']);
     expect(sheet('meta').columns.map((c) => c.header)).toEqual(['Ключ', 'Значение']);
     expect(sheet('log').columns.map((c) => c.header)).toEqual(['Время', 'Уровень', 'Сообщение', 'Подробности']);
     expect(sheet('costs').columns.map((c) => c.key)).toEqual([
       'id', 'entryDate', 'paymentDate', 'status', 'targetType', 'targetId', 'costType', 'payeeType', 'payeeId', 'payeeText',
-      'executor', 'invoiceNumber', 'invoiceDate', 'amount', 'currency', 'rate', 'rateDate', 'rateManual', 'amountRub', 'comment',
+      'executor', 'invoiceNumber', 'invoiceDate', 'amount', 'currency', 'rate', 'rateDate', 'rateManual', 'amountRub', 'comment', 'code',
     ]);
+  });
+
+  it('G28/G29/G33: номера заказа и затраты, тип поставки и номер контейнера — новые колонки в конце; лист «Типы поставки»', () => {
+    expect(sheet('orders').columns.at(-1)).toMatchObject({ key: 'code', header: 'Номер заказа', type: 'string' });
+    expect(sheet('costs').columns.at(-1)).toMatchObject({ key: 'code', header: 'Номер затраты', type: 'string' });
+    expect(sheet('shipments').columns.map((c) => c.key)).toEqual([
+      'id', 'number', 'mode', 'carrierId', 'consolidationDate', 'sentDate', 'arrivalDate', 'vatRate', 'comment', 'typeId', 'containerNo',
+    ]);
+    expect(sheet('shipments').columns.at(-1)).toMatchObject({ header: 'Номер контейнера / накладной' });
+    expect(sheet('shipmentTypes').columns.map((c) => [c.key, c.header])).toEqual([['id', 'id'], ['name', 'Название'], ['basis', 'Делить доставку']]);
   });
 
   it('G21: «Страны», «Провинции»; страна города, поставщика и агента — новые колонки в конце (старые таблицы догоняются)', () => {

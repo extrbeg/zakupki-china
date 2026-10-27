@@ -20,6 +20,8 @@ export type AmountSource = 'currency' | 'rub';
 
 export interface CostDraft {
   id?: string;
+  /** Номер затраты (G33); при смене привязки не меняется. */
+  code?: string;
   entryDate?: ISODate;
   paymentDate?: ISODate;
   status: CostStatus;
@@ -59,7 +61,7 @@ export function draftFromCost(c: Cost): CostDraft {
   const rateMode: RateMode = c.rateManual && pos(c.rate) && c.currency !== 'RUB' ? 'manual'
     : c.status === 'fact' && c.currency !== 'RUB' && pos(c.rate) ? 'stored' : 'auto';
   return {
-    id: c.id, entryDate: c.entryDate, paymentDate: c.paymentDate, status: c.status, targetType: c.targetType, targetId: c.targetId || undefined,
+    id: c.id, code: c.code, entryDate: c.entryDate, paymentDate: c.paymentDate, status: c.status, targetType: c.targetType, targetId: c.targetId || undefined,
     costType: c.costType || undefined, payeeType: c.payeeType, payeeId: c.payeeId, payeeText: c.payeeText, executor: c.executor,
     invoiceNumber: c.invoiceNumber, invoiceDate: c.invoiceDate, currency: c.currency,
     amount: num(c.amount) ? c.amount : undefined, amountRub: num(c.amountRub) ? c.amountRub : undefined,
@@ -130,7 +132,7 @@ export function draftAmounts(d: CostDraft, rate: number | undefined): { amount?:
 /** Есть ли в истории курс именно на эту дату (без подстановки последнего до даты). */
 export const hasExactRate = (auto: AutoRate) => Boolean(auto.pick?.exact);
 
-export type CostErrors = Partial<Record<'entryDate' | 'paymentDate' | 'targetId' | 'costType' | 'amount' | 'rate' | 'payeeText', string>>;
+export type CostErrors = Partial<Record<'code' | 'entryDate' | 'paymentDate' | 'targetId' | 'costType' | 'amount' | 'rate' | 'payeeText', string>>;
 
 export const NO_RATE_TEXT = 'нет курса — введите вручную';
 
@@ -165,6 +167,7 @@ export function buildCost(d: CostDraft, auto: AutoRate): { cost?: Cost; errors: 
   const opt = <K extends keyof Cost>(k: K, v: Cost[K] | undefined) => {
     if (v !== undefined && v !== '') base[k] = v;
   };
+  opt('code', d.code?.trim());
   opt('paymentDate', d.paymentDate);
   if (d.payeeType) {
     base.payeeType = d.payeeType;

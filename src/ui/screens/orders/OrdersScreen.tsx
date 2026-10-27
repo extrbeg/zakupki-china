@@ -7,6 +7,7 @@ import { DataTable, EmptyState, TextField, type DataColumn } from '../../compone
 import type { Order } from '../../../domain/model';
 import { formatDate } from '../../format';
 import { filterOrders } from './orderLogic';
+import { compareOrders, orderLabel } from '../../../domain/numbering';
 import './orders.css';
 
 export default function OrdersScreen() {
@@ -14,7 +15,7 @@ export default function OrdersScreen() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
 
-  const rows = useMemo(() => [...filterOrders(ds, query)].sort((a, b) => b.number - a.number), [ds, query]);
+  const rows = useMemo(() => [...filterOrders(ds, query)].sort((a, b) => compareOrders(b, a)), [ds, query]);
   const supplierCount = useMemo(() => {
     const m = new Map<string, number>();
     for (const so of ds.supplierOrders) m.set(so.orderId, (m.get(so.orderId) ?? 0) + 1);
@@ -44,7 +45,7 @@ export default function OrdersScreen() {
   }
 
   const columns: DataColumn<Order>[] = [
-    { key: 'number', header: '№', render: (o) => String(o.number), align: 'right', width: '4rem' },
+    { key: 'number', header: '№', render: (o) => orderLabel(o), align: 'right', width: '7rem' },
     { key: 'date', header: 'Дата', render: (o) => formatDate(o.date) },
     { key: 'customer', header: 'Заказчик', render: (o) => o.customer ?? '' },
     { key: 'title', header: 'Название', render: (o) => o.title ?? '' },

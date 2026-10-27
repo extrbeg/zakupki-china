@@ -416,7 +416,7 @@ describe('журнал затрат', () => {
     renderCosts({ ...seed, costs });
     await screen.findByText('первый');
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
-    expect(headers).toEqual(['Дата заполнения', 'Дата оплаты', 'Статус', 'Привязка', 'Тип', 'Кому платим', 'Исполнитель', 'Счёт', 'Сумма', 'Валюта', 'Курс', 'Сумма, ₽', 'Комментарий']);
+    expect(headers).toEqual(['Номер', 'Дата заполнения', 'Дата оплаты', 'Статус', 'Привязка', 'Тип', 'Кому платим', 'Исполнитель', 'Счёт', 'Сумма', 'Валюта', 'Курс', 'Сумма, ₽', 'Комментарий']);
     expect(visible()).toHaveLength(4);
     const row4 = screen.getByText('четвёртый').closest('tr') as HTMLElement;
     expect(within(row4).getByText(/вручную/)).toBeTruthy();
@@ -461,5 +461,51 @@ describe('журнал затрат', () => {
     renderCosts(seed);
     expect(await screen.findByText('Затрат пока нет')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Добавить затрату' })).toBeTruthy();
+  });
+});
+
+describe('номер затраты (G33)', () => {
+  it('новая затрата: номер по привязке — Р-ГГГГ-<заказ>-NNN и Р-ГГГГ-П<поставка>-NNN; сохраняется', async () => {
+    const { store } = renderCosts({ ...seed, costs: [baseCost({ id: 'c0', code: 'Р-2026-12-004' })] });
+    await openNew();
+    set(/^Привязка/, 'supplierOrder');
+    set(/^Объект привязки/, 'so1');
+    expect(field(/^Номер затраты/).value).toBe('Р-2026-12-005');
+    set(/^Привязка/, 'shipment');
+    set(/^Объект привязки/, 'sh1');
+    expect(field(/^Номер затраты/).value).toBe('Р-2026-ПК-7-001');
+    set(/^Тип затраты/, 'Аванс');
+    set(/^Сумма в валюте/, '100');
+    set(/^Дата оплаты/, '2026-10-25');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    const list = await saved(store, 2);
+    expect(list.find((c) => c.id !== 'c0')?.code).toBe('Р-2026-ПК-7-001');
+  });
+
+  it('при смене привязки номер не меняется; номер в журнале', async () => {
+    const { store } = renderCosts({ ...seed, costs: [baseCost({ id: 'c1', code: 'Р-2026-12-001', amount: 10, paymentDate: '2026-10-01', comment: 'мой' })] });
+    const row = (await screen.findByText('мой')).closest('tr') as HTMLElement;
+    expect(within(row).getByText('Р-2026-12-001')).toBeTruthy();
+    fireEvent.click(row);
+    set(/^Привязка/, 'order');
+    set(/^Объект привязки/, 'o6');
+    expect(field(/^Номер затраты/).value).toBe('Р-2026-12-001');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(async () => expect((await store.load()).costs[0].targetId).toBe('o6'));
+    expect((await store.load()).costs[0].code).toBe('Р-2026-12-001');
+  });
+
+  it('номер правится; занятый — ошибка у поля, ничего не записано', async () => {
+    const { store } = renderCosts({ ...seed, costs: [baseCost({ id: 'c1', code: 'Р-2026-12-001', amount: 10, paymentDate: '2026-10-01' })] });
+    await openNew();
+    set(/^Привязка/, 'order');
+    set(/^Объект привязки/, 'o12');
+    set(/^Тип затраты/, 'Аванс');
+    set(/^Сумма в валюте/, '5');
+    set(/^Дата оплаты/, '2026-10-25');
+    set(/^Номер затраты/, 'р-2026-12-001');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    expect(await screen.findByText('Номер р-2026-12-001 уже есть')).toBeTruthy();
+    expect((await store.load()).costs).toHaveLength(1);
   });
 });

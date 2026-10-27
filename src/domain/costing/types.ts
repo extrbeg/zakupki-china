@@ -35,9 +35,14 @@ export interface OrderTotals { orderId: string; sumByCurrency: Partial<Record<Cu
  */
 export interface CustomsForecast { declarationId: string; shipmentId: string; customsValue: number; duty: number; vat: number; vatRate: number }
 
+/** Доля затраты, легшая на партию (₽, без округления); партия остатка — `rest:<lineId>`. */
+export interface CostAllocation { costId: string; batchId: string; rub: number }
+
 export interface CostingResult {
   costsRub: CostRub[]; batches: BatchCost[]; lines: LineCost[]; orders: OrderTotals[]; unallocatedRub: number; warnings: CostWarning[];
   customsForecasts: CustomsForecast[];
+  /** Фактическое распределение каждой затраты по партиям (G31). */
+  allocations: CostAllocation[];
 }
 
 export interface CoefSuggestion { value: number | null; basis: 'supplier+mode' | 'mode' | 'all' | 'none'; points: number }

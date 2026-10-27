@@ -142,3 +142,17 @@ describe('buildReportRows — лист «Себестоимость»', () => {
     expect(closed[cols.indexOf('Статус')]).toBe('закрыт');
   });
 });
+
+describe('номер заказа с кодом (G33)', () => {
+  it('отчёт и ссылки предупреждений — кодом З-ГГГГ-NNN', () => {
+    const ds = dataset();
+    ds.orders[0] = { ...ds.orders[0], code: 'З-2026-012' };
+    const costing = computeCosting(ds, TODAY);
+    const sel = new Set(['o12', 'o6']);
+    const report = buildReportRows(ds, buildRows(ds, costing, sel), sel, TODAY);
+    expect(report[2]).toEqual(['Заказы', '6, З-2026-012']);
+    expect(report.find((r) => r[0] === 'З-2026-012')).toBeTruthy();
+    const notComplete = selectionWarnings(ds, costing, sel).find((w) => w.warning.code === 'NOT_COMPLETE');
+    expect(notComplete?.links).toEqual([{ to: '/orders/o12', label: 'Заказ З-2026-012' }]);
+  });
+});

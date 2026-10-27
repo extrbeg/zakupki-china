@@ -13,13 +13,13 @@ describe('список и создание поставки', () => {
     expect(await screen.findByLabelText(/^Номер поставки/)).toBeTruthy();
     expect((screen.getByLabelText(/^НДС, %/) as HTMLInputElement).value).toBe('20');
     typeInto(/^Номер поставки/, 'К-1');
-    typeInto('Тип поставки', 'air');
+    typeInto('Тип поставки', 'stp_air');   // G29: тип — из «Типов поставки»
     pickSuggestion(screen.getByLabelText('Перевозчик'), 'Море-Транс');
     typeInto('Отправка в РФ', '2026-11-01');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить поставку' }));
     await waitFor(async () => expect((await store.load()).shipments).toHaveLength(1));
     const saved = (await store.load()).shipments[0];
-    expect(saved).toMatchObject({ number: 'К-1', mode: 'air', carrierId: 'k1', sentDate: '2026-11-01', vatRate: 20 });
+    expect(saved).toMatchObject({ number: 'К-1', typeId: 'stp_air', mode: 'air', carrierId: 'k1', sentDate: '2026-11-01', vatRate: 20 });
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe(`/shipments/${saved.id}`));
   });
 
@@ -40,9 +40,53 @@ describe('список и создание поставки', () => {
 
   it('пустой номер — ошибка у поля, ничего не записано', async () => {
     const { store } = renderAt('/shipments/new', baseSeed);
+    typeInto(await screen.findByLabelText(/^Номер поставки/), '');   // номер присваивается сам — стёрли руками
     fireEvent.click(await screen.findByRole('button', { name: 'Сохранить поставку' }));
     expect(await screen.findByText('Введите номер поставки')).toBeTruthy();
     expect((await store.load()).shipments).toHaveLength(0);
+  });
+});
+
+describe('номер и тип поставки (G28, G29)', () => {
+  it('номер присваивается сам: П-ГГГГ-NNN по году отправки в РФ, пока его не правили; номер контейнера — отдельным полем', async () => {
+    const { store } = renderAt('/shipments/new', { ...baseSeed, shipments: [shipment('sh1', 'П-2026-004'), shipment('sh2', '32-1')] });
+    const number = (await screen.findByLabelText(/^Номер поставки/)) as HTMLInputElement;
+    expect(number.value).toBe('П-2026-005');
+    typeInto('Отправка в РФ', '2027-01-10');
+    expect(number.value).toBe('П-2027-001');
+    typeInto(/^Номер контейнера/, 'MSCU1234567');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить поставку' }));
+    await waitFor(async () => expect((await store.load()).shipments).toHaveLength(3));
+    expect((await store.load()).shipments.find((s) => s.number === 'П-2027-001')).toMatchObject({ containerNo: 'MSCU1234567', typeId: 'stp_sea', mode: 'sea_container' });
+  });
+
+  it('номер правится; занятый — ошибка', async () => {
+    const { store } = renderAt('/shipments/new', { ...baseSeed, shipments: [shipment('sh1', 'П-2026-004')] });
+    typeInto(await screen.findByLabelText(/^Номер поставки/), 'п-2026-004');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить поставку' }));
+    expect(await screen.findByText('Поставка «п-2026-004» уже есть')).toBeTruthy();
+    expect((await store.load()).shipments).toHaveLength(1);
+  });
+
+  it('«+ Добавить…» в типе: название и правило — тип записан в «Типы поставки» и выбран', async () => {
+    const { store } = renderAt('/shipments/new', { ...baseSeed, shipmentTypes: [{ id: 'stp_sea', name: 'Море, контейнер', basis: 'cbm' }] });
+    typeInto(await screen.findByLabelText('Тип поставки'), '\u0000add');
+    typeInto(screen.getByLabelText('Новый тип поставки'), 'Ж/д, сборный');
+    typeInto(screen.getByLabelText('Делить доставку'), 'weight');
+    fireEvent.click(screen.getByRole('button', { name: 'Добавить' }));
+    await waitFor(async () => expect((await store.load()).shipmentTypes).toHaveLength(2));
+    const added = (await store.load()).shipmentTypes.find((t) => t.name === 'Ж/д, сборный')!;
+    expect(added).toMatchObject({ basis: 'weight' });
+    await waitFor(() => expect((screen.getByLabelText('Тип поставки') as HTMLSelectElement).value).toBe(added.id));
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить поставку' }));
+    await waitFor(async () => expect((await store.load()).shipments).toHaveLength(1));
+    expect((await store.load()).shipments[0]).toMatchObject({ typeId: added.id, mode: 'other' });
+  });
+
+  it('список: тип — названием из «Типов поставки»', async () => {
+    renderAt('/shipments', { ...baseSeed, shipmentTypes: [{ id: 't1', name: 'Ж/д, контейнер', basis: 'cbm' }], shipments: [shipment('sh1', 'П-2026-001', { typeId: 't1' })] });
+    const row = (await screen.findByText('П-2026-001')).closest('tr')!;
+    expect(within(row).getByText('Ж/д, контейнер')).toBeTruthy();
   });
 });
 
@@ -224,7 +268,7 @@ describe('предупреждения движка', () => {
       shipments: [shipment('sh1', 'К-1')],
       batches: [{ id: 'b1', shipmentId: 'sh1', lineId: 'l1', qty: 10, cbm: 1, weight: 5 }],
     });
-    await screen.findByText('Партии');
+    await screen.findByText('Что едет');
     expect(screen.queryByRole('region', { name: 'Предупреждения' })).toBeNull();
   });
 });
@@ -293,5 +337,57 @@ describe('затраты поставки', () => {
     const section = (await screen.findByRole('heading', { name: 'Затраты поставки' })).closest('section')!;
     expect(within(section).getByRole('link', { name: 'Добавить затрату' }).getAttribute('href')).toBe('/costs?add=shipment:sh1');
     expect(within(section).getByRole('link', { name: 'Все затраты' }).getAttribute('href')).toBe('/costs?shipment=sh1');
+  });
+});
+
+describe('что едет (G32)', () => {
+  const seed = {
+    ...baseSeed,
+    orders: [
+      { id: 'o1', number: 12, code: 'З-2026-012', date: '2026-09-01', customer: 'ТНК', costsComplete: false },
+      { id: 'o2', number: 6, code: 'З-2026-006', date: '2026-08-01', customer: 'Газстрой', costsComplete: false },
+    ],
+    shipments: [shipment('sh1', 'П-2026-001')],
+  };
+
+  it('группы заказ → поставщик → товар, по номеру заказа; итоги поставки — CBM, вес, мест', async () => {
+    renderAt('/shipments/sh1', {
+      ...seed,
+      batches: [
+        { id: 'b1', shipmentId: 'sh1', lineId: 'l1', qty: 600, cbm: 6, weight: 300, places: 12 },
+        { id: 'b2', shipmentId: 'sh1', lineId: 'l2', qty: 100, cbm: 1.5, weight: 80, places: 3 },
+      ],
+    });
+    const section = await screen.findByRole('region', { name: 'Что едет' });
+    const groups = within(section).getAllByRole('rowheader').map((h) => h.textContent);
+    expect(groups).toEqual(['Заказ З-2026-006 · Газстрой', 'Заказ З-2026-012 · ТНК']);
+    expect(within(section).getByText('Поставщик: Beta Cable')).toBeTruthy();
+    expect(within(section).getByText('Поставщик: Alpha Valve')).toBeTruthy();
+    expect(within(section).getByRole('link', { name: 'З-2026-012' }).getAttribute('href')).toBe('/orders/o1');
+    const totals = within(section).getByTestId('shipment-totals');
+    expect(within(totals).getByTestId('total-cbm').textContent).toBe('7,5');
+    expect(within(totals).getByTestId('total-weight').textContent).toBe('380');
+    expect(within(totals).getByTestId('total-places').textContent).toBe('15');
+  });
+
+  it('«Добавить из заказа»: поиск заказа по заказчику → товары с остатком целиком → партии пропорционально', async () => {
+    const { store } = renderAt('/shipments/sh1', { ...seed, batches: [{ id: 'b0', shipmentId: 'sh1', lineId: 'l1', qty: 400 }] });
+    fireEvent.click(await screen.findByRole('button', { name: 'Добавить из заказа' }));
+    const form = screen.getByRole('form', { name: 'Добавить из заказа' });
+    pickSuggestion(within(form).getByLabelText(/^Заказ/), /З-2026-012/, 'тнк');
+    const qty = within(form).getByLabelText('В поставку: Кран шаровой') as HTMLInputElement;
+    expect(qty.value).toBe('600');
+    expect((within(form).getByLabelText('В поставку: Фланец') as HTMLInputElement).value).toBe('100');
+    expect(within(form).queryByLabelText('В поставку: Не закупаем')).toBeNull();
+    typeInto(qty, '700');
+    fireEvent.click(within(form).getByRole('button', { name: 'Добавить' }));
+    expect(await within(form).findByText('В партиях 1100 из 1000 шт')).toBeTruthy();
+    expect((await store.load()).batches).toHaveLength(1);
+    typeInto(qty, '500');
+    typeInto(within(form).getByLabelText('В поставку: Фланец'), '0');
+    fireEvent.click(within(form).getByRole('button', { name: 'Добавить' }));
+    await waitFor(async () => expect((await store.load()).batches).toHaveLength(2));
+    expect((await store.load()).batches.find((b) => b.id !== 'b0')).toMatchObject({ shipmentId: 'sh1', lineId: 'l1', qty: 500, cbm: 5, weight: 250, places: 10 });
+    expect(await screen.findByRole('status')).toBeTruthy();
   });
 });

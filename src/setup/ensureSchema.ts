@@ -1,6 +1,6 @@
 // Приведение таблицы пользователя к схеме. Идемпотентно: создаёт недостающие листы и колонки,
 // не удаляет и не переставляет существующее; чужую таблицу (лист схемы с данными без «id» в строке 1) не трогает вовсе; форматы ставит только тому, что создало само;
-// «Списки» заполняет, только если там нет данных; в «Настройки» дописывает недостающие ключи; версия схемы — в «_meta».
+// «Списки» и «Типы поставки» заполняет, только если там нет данных; в «Настройки» дописывает недостающие ключи; версия схемы — в «_meta».
 
 import type { SheetsApi } from '../google/sheetsApi';
 import { a1, rect } from '../google/a1';
@@ -9,6 +9,7 @@ import type { ListItem } from '../domain/model';
 import { SCHEMA_VERSION, SHEETS, sheetFor, toRow, type ColType, type ColumnDef, type SheetDef } from '../store/schema';
 import { mapHeaders, upsertKeyValue } from '../store/sheetsStore';
 import { DEFAULT_COST_TYPES, DEFAULT_SETTINGS } from './defaults';
+import { DEFAULT_SHIPMENT_TYPES } from '../domain/shipmentTypes';
 
 export interface SchemaReport { createdSheets: string[]; addedColumns: { sheet: string; headers: string[] }[] }
 
@@ -32,7 +33,7 @@ const NUMBER_FORMATS: Partial<Record<ColType, { type: string; pattern: string }>
 };
 
 /** Листы, которые читаются целиком (нужно знать, есть ли в них данные). */
-const READ_WHOLE = new Set(['lists', 'settings', 'meta']);
+const READ_WHOLE = new Set(['lists', 'settings', 'meta', 'shipmentTypes']);
 
 const norm = (v: unknown) => String(v ?? '').trim();
 
@@ -143,6 +144,10 @@ export async function ensureSchema(api: SheetsApi, spreadsheetId: string): Promi
     const items: ListItem[] = DEFAULT_COST_TYPES.map((value, i) => ({ id: newId('lst'), list: 'costType', value, order: i + 1 }));
     await appendRecords(lists, items);
   }
+
+  // G29: «Типы поставки» — заранее заведённые типы (постоянные id), только если в листе нет данных
+  const shipmentTypes = sheetFor('shipmentTypes');
+  if (dataRows(shipmentTypes).length === 0) await appendRecords(shipmentTypes, DEFAULT_SHIPMENT_TYPES.map((t) => ({ ...t })));
 
   const settings = sheetFor('settings');
   const settingsIdx = mapHeaders(settings, finalHeaders.get(settings.sheet) ?? []);

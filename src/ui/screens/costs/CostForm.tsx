@@ -2,12 +2,14 @@
 // Курс подставляется сам (см. costDraft.ts), правка руками — «курс вручную».
 
 import { useMemo, useState } from 'react';
+import { F } from '../../../domain/labels';
+import { pastValues } from '../../directories/records';
 import type { Cost, CostStatus, CostTargetType, Currency, Dataset, ISODate, PayeeType } from '../../../domain/model';
 import { newId } from '../../../domain/ids';
 import { costCodeTaken, nextCostCode } from '../../../domain/numbering';
 import { CostSplit } from './CostSplit';
 import { useData } from '../../DataContext';
-import { ConfirmDelete, DateField, DirectorySelectField, ErrorBanner, FormGrid, ListSelectField, NumberField, SelectField, TextField, isBadNumber, type DirectoryEntity } from '../../components';
+import { AddableSelect, ConfirmDelete, DateField, DirectorySelectField, ErrorBanner, FormGrid, ListSelectField, NumberField, SelectField, TextField, isBadNumber, type DirectoryEntity } from '../../components';
 import { CURRENCY_OPTIONS, formatRate, ruDate } from '../../format';
 import {
   autoRate, buildCost, draftAmounts, draftFromCost, effectiveRate, newDraft, NO_RATE_TEXT, rateIsAuto,
@@ -161,8 +163,8 @@ export function CostForm({ cost, preset, onClose }: { cost?: Cost; preset?: Cost
           options={TARGET_TYPES.map((t) => ({ value: t, label: TARGET_TYPE_LABEL[t] }))}
           onChange={(v) => setTargetType((v as CostTargetType | undefined) ?? 'order')}
         />
-        <SelectField
-          label="Объект привязки" value={d.targetId} options={objOptions} placeholder="— выберите —"
+        <AddableSelect
+          label="Объект привязки" search value={d.targetId} options={objOptions} placeholder="— выберите —"
           onChange={setTarget} error={errors.targetId} required className="ui-card__wide"
         />
         <ListSelectField
@@ -175,15 +177,15 @@ export function CostForm({ cost, preset, onClose }: { cost?: Cost; preset?: Cost
           onChange={(v) => patch({ payeeType: v as PayeeType | undefined, payeeId: undefined })}
         />
         {d.payeeType === 'text' ? (
-          <TextField label="Получатель (текстом)" value={d.payeeText} onChange={(v) => patch({ payeeText: v })} />
+          <TextField label="Получатель (текстом)" value={d.payeeText} onChange={(v) => patch({ payeeText: v })} suggestions={pastValues(ds.costs, 'payeeText')} />
         ) : d.payeeType ? (
           <DirectorySelectField
             key={d.payeeType} entity={PAYEE_ENTITY[d.payeeType]} label="Получатель" value={d.payeeId} placeholder="— выберите —"
             onChange={(v) => patch({ payeeId: v })}
           />
         ) : null}
-        <TextField label="Исполнитель операции" value={d.executor} onChange={(v) => patch({ executor: v })} />
-        <TextField label="Номер счёта" value={d.invoiceNumber} onChange={(v) => patch({ invoiceNumber: v })} />
+        <TextField label={F.executor} value={d.executor} onChange={(v) => patch({ executor: v })} suggestions={pastValues(ds.costs, 'executor')} />
+        <TextField label={F.invoiceNumber} value={d.invoiceNumber} onChange={(v) => patch({ invoiceNumber: v })} suggestions={pastValues(ds.costs, 'invoiceNumber')} />
         <DateField label="Дата счёта" value={d.invoiceDate} onChange={(v) => patch({ invoiceDate: v })} />
       </FormGrid>
 

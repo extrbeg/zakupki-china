@@ -17,11 +17,11 @@ const stored = async (store: { load(): Promise<{ lists: ListItem[] }> }, key: st
   (await store.load()).lists.filter((l) => l.list === key).sort((a, b) => a.order - b.order).map((l) => l.value);
 
 describe('экран «Списки»', () => {
-  it('показывает все восемь списков со значениями по порядку', async () => {
+  it('показывает все списки со значениями по порядку', async () => {
     renderAt('/lists', { lists });
     await screen.findByRole('heading', { name: 'Списки' });
     const titles = screen.getAllByRole('region').map((r) => r.getAttribute('aria-label'));
-    expect(titles).toEqual(['Плательщики', 'Подразделения', 'Заказчики', 'Типы затрат', 'Типы компании', 'Направления', 'Специализации', 'Условия оплаты', 'Типы поставки']);
+    expect(titles).toEqual(['Плательщики', 'Подразделения', 'Заказчики', 'Типы затрат', 'Типы компании', 'Направления', 'Специализации', 'Условия оплаты', 'Единицы измерения', 'Типы поставки']);
     expect(values('Плательщики')).toEqual(['ООО Альфа', 'ООО Бета', 'ООО Гамма']);
   });
 

@@ -87,8 +87,8 @@ describe('экран «Себестоимость»', () => {
     const heads = screen.getAllByRole('columnheader');
     const ad = heads.find((th) => norm(th.textContent) === 'Расч. коэфф.') as HTMLElement;
     const aw = heads.find((th) => norm(th.textContent) === 'Факт. коэфф.') as HTMLElement;
-    expect(ad.title).toMatch(/^Расчётный коэффициент себестоимости доставки \(AD\)/);
-    expect(aw.title).toMatch(/^Фактический коэффициент себестоимости доставки \(AW\)/);
+    expect(ad.title).toMatch(/^Расчётный коэффициент себестоимости доставки: /);
+    expect(aw.title).toMatch(/^Фактический коэффициент себестоимости доставки: /);
     expect(heads.some((th) => ['AD', 'AW'].includes(norm(th.textContent)))).toBe(false);
     expect(within(screen.getByTestId('totals')).getByText('Прогноз по расчётному коэффициенту себестоимости доставки, ₽')).toBeTruthy();
     expect(within(screen.getByTestId('totals')).queryByText(/по AD/)).toBeNull();

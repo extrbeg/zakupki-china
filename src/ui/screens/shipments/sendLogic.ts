@@ -4,7 +4,7 @@
 import { newId } from '../../../domain/ids';
 import type { Batch, Dataset, ISODate, Line, Order, Shipment } from '../../../domain/model';
 import { nextShipmentCode, shipmentCodeYear } from '../../../domain/numbering';
-import { TYPE_ID_BY_MODE } from '../../../domain/shipmentTypes';
+import { modeForType, TYPE_ID_BY_MODE } from '../../../domain/shipmentTypes';
 import { validateBatchQty } from '../../../domain/validation';
 import { cleanRecord } from '../../directories/records';
 import { defaultVatRate, proportionalDefaults, shippedQty } from './shipmentLogic';
@@ -74,10 +74,12 @@ export function planSendBatches(_ds: Pick<Dataset, 'lines'>, shipmentId: string,
 }
 
 /** Новая поставка «на лету»: номер П-ГГГГ-NNN следующий в году, тип «Море, контейнер», НДС из настроек. */
-export function newShipmentDraft(ds: Dataset, today: ISODate): Shipment {
+/** Новая поставка; typeId — тип поставки поставщиков заказа (не задан — море, контейнер). */
+export function newShipmentDraft(ds: Dataset, today: ISODate, typeId?: string): Shipment {
+  const type = typeId ?? TYPE_ID_BY_MODE.sea_container;
   return {
     id: newId('shp'), number: nextShipmentCode(ds.shipments, shipmentCodeYear({}, today)),
-    mode: 'sea_container', typeId: TYPE_ID_BY_MODE.sea_container, vatRate: defaultVatRate(ds),
+    mode: modeForType(type), typeId: type, vatRate: defaultVatRate(ds),
   };
 }
 

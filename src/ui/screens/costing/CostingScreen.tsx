@@ -7,8 +7,9 @@ import { Link } from 'react-router-dom';
 import { EmptyState, ErrorBanner, TextField } from '../../components';
 import { COST_CATEGORIES, COST_CATEGORY_LABEL } from '../../../domain/costing';
 import { useData } from '../../DataContext';
+import { F, SHORT, TIP } from '../../../domain/labels';
 import { AD_LABEL, AD_SHORT, AW_SHORT, adTip, awTip } from '../orders/coefLabels';
-import { EMPTY, formatMoney as money, formatPct, formatQty } from '../../format';
+import { EMPTY, formatMoney as money, formatPct, formatQty, formatQtyUnit, unitOf } from '../../format';
 import { buildReportRows, buildRows, lineTitle, selectionTotals, selectionWarnings, type CostingRow } from './costingLogic';
 import './costing.css';
 
@@ -31,7 +32,7 @@ function LineDetail({ row, shipmentNumber }: { row: CostingRow; shipmentNumber: 
               <tr key={k}><th scope="row">{COST_CATEGORY_LABEL[k]}</th><td className="costing-num">{money(c.breakdown[k])}</td></tr>
             ))}
             <tr><th scope="row">Итого</th><td className="costing-num">{money(c.total)}</td></tr>
-            <tr><th scope="row">Себестоимость за единицу (средневзвешенная)</th><td className="costing-num">{money(c.AV)}</td></tr>
+            <tr><th scope="row">{F.costUnit} (средневзвешенная)</th><td className="costing-num">{money(c.AV)}</td></tr>
           </tbody>
         </table>
       </section>
@@ -143,7 +144,7 @@ export default function CostingScreen() {
           <dl className="costing-totals" data-testid="totals">
             <div><dt>Позиций в работе</dt><dd>{totals.lines}</dd></div>
             <div><dt>Себестоимость выбора, ₽</dt><dd>{money(totals.total)}</dd></div>
-            <div><dt title={`${AD_LABEL} (AD)`}>Прогноз по расчётному коэффициенту себестоимости доставки, ₽</dt><dd>{money(totals.forecastRub)}</dd></div>
+            <div><dt title={AD_LABEL}>Прогноз по расчётному коэффициенту себестоимости доставки, ₽</dt><dd>{money(totals.forecastRub)}</dd></div>
             {COST_CATEGORIES.filter((k) => totals.breakdown[k] !== 0).map((k) => (
               <div key={k}><dt>{COST_CATEGORY_LABEL[k]}, ₽</dt><dd>{money(totals.breakdown[k])}</dd></div>
             ))}
@@ -169,10 +170,10 @@ export default function CostingScreen() {
                   <tr>
                     <th scope="col" aria-label="Раскрыть" />
                     <th scope="col">Заказ</th><th scope="col">Поставщик</th><th scope="col">Позиция</th>
-                    <th scope="col" className="costing-num">Кол-во</th><th scope="col" className="costing-num">Цена</th>
-                    <th scope="col" className="costing-num" title="Цена в рублях за единицу по курсу даты расчёта (Y)">Цена ₽/шт</th><th scope="col" className="costing-num" title="Прогноз цены в РФ за единицу = цена в ₽ × расчётный коэффициент (AB)">Прогноз ₽/шт</th><th scope="col" className="costing-num costing-coef" title={adTip('прогноз цены в РФ = цена в ₽ × этот коэффициент')}>{AD_SHORT}</th>
-                    <th scope="col" className="costing-num">Себестоимость, ₽</th><th scope="col" className="costing-num" title="Себестоимость за единицу (AV)">Себест. ₽/шт</th>
-                    <th scope="col" className="costing-num costing-coef" title={awTip('себестоимость за единицу / цена в ₽ за единицу')}>{AW_SHORT}</th><th scope="col" className="costing-num">Отклонение</th>
+                    <th scope="col" className="costing-num">{F.qty}</th><th scope="col" className="costing-num" title={F.unitPrice}>{SHORT.unitPrice}</th>
+                    <th scope="col" className="costing-num" title={`${F.priceRub}: ${TIP.priceRub.toLowerCase()}`}>{SHORT.priceRub}</th><th scope="col" className="costing-num" title={`${F.forecast}: ${TIP.forecast.toLowerCase()}`}>{SHORT.forecast}</th><th scope="col" className="costing-num costing-coef" title={adTip('прогноз цены в РФ = цена в ₽ за единицу × этот коэффициент')}>{AD_SHORT}</th>
+                    <th scope="col" className="costing-num">Себестоимость, ₽</th><th scope="col" className="costing-num" title={`${F.costUnit}: ${TIP.costUnit.toLowerCase()}`}>{SHORT.costUnit}</th>
+                    <th scope="col" className="costing-num costing-coef" title={awTip(TIP.coefFact.toLowerCase())}>{AW_SHORT}</th><th scope="col" className="costing-num" title={TIP.deviation}>{F.deviation}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -192,7 +193,7 @@ export default function CostingScreen() {
                           <td>{orderRef(r.order)}</td>
                           <td>{r.supplier?.name ?? EMPTY}</td>
                           <td>{title}</td>
-                          <td className="costing-num">{formatQty(r.line.qty)}</td>
+                          <td className="costing-num">{formatQtyUnit(r.line.qty, unitOf(r.line))}</td>
                           <td className="costing-num">{money(r.line.unitPrice)} {r.so?.currency ?? ''}</td>
                           <td className="costing-num">{money(c.Y)}</td>
                           <td className="costing-num">{money(c.AB)}</td>

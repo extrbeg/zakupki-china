@@ -1,6 +1,7 @@
 // Карточка платёжного агента (история 64): создание и правка внутри экрана списка.
 
 import { useState } from 'react';
+import { F } from '../../../domain/labels';
 import { newId } from '../../../domain/ids';
 import type { PaymentAgent } from '../../../domain/model';
 import { useData } from '../../DataContext';
@@ -9,7 +10,7 @@ import { PlaceFields } from '../../directories/PlaceFields';
 import { citiesOfCountry, defaultCountryName } from '../../directories/geography';
 import { validateCityProvince } from '../../directories/cityLookup';
 import { resolveCityPair } from '../../directories/cityPair';
-import { cleanRecord, validateName } from '../../directories/records';
+import { cleanRecord, validateName, pastValues } from '../../directories/records';
 import { agentDeleteBlock } from '../../directories/usage';
 import '../../directories/directories.css';
 
@@ -24,6 +25,7 @@ export function AgentCard({ agent, onClose }: { agent?: PaymentAgent; onClose: (
   const text = (key: keyof PaymentAgent) => ({
     value: draft[key] as string | undefined,
     onChange: (v: string) => setDraft((d) => ({ ...d, [key]: v })),
+    suggestions: pastValues(data.ds.agents.filter((x) => x.id !== agent?.id), key),   // прежние значения поля у других записей
   });
 
   // страна по умолчанию — Китай под текущим названием (F3); считается по загруженному набору, а не при открытии формы
@@ -50,17 +52,17 @@ export function AgentCard({ agent, onClose }: { agent?: PaymentAgent; onClose: (
       <h2 className="ui-card__title">{agent ? agent.name : 'Новый платёжный агент'}</h2>
       {saveError !== undefined ? <ErrorBanner error={saveError} /> : null}
       <FormGrid>
-        <TextField label="Наименование" required error={errors.name} {...text('name')} />
-        <TextField label="Контактное лицо" {...text('contactPerson')} />
-        <TextField label="Юридический адрес" {...text('legalAddress')} />
+        <TextField label={F.name} required error={errors.name} {...text('name')} />
+        <TextField label={F.contactPerson} {...text('contactPerson')} />
+        <TextField label={F.legalAddress} {...text('legalAddress')} />
         <PlaceFields
           ds={ds} value={{ ...draft, country }} provinceError={errors.province}
           onChange={(next) => setDraft((d) => ({ ...d, ...next }))}
         />
-        <TextField label="Телефон" type="tel" {...text('phone')} />
-        <TextField label="Email" type="email" {...text('email')} />
-        <TextField label="Реквизиты" multiline className="ui-card__full" {...text('requisites')} />
-        <TextField label="Комментарий" multiline className="ui-card__full" {...text('comment')} />
+        <TextField label={F.phone} type="tel" {...text('phone')} />
+        <TextField label={F.email} type="email" {...text('email')} />
+        <TextField label={F.requisites} multiline className="ui-card__full" {...text('requisites')} />
+        <TextField label={F.comment} multiline className="ui-card__full" {...text('comment')} />
       </FormGrid>
       <div className="ui-card__actions">
         <button type="submit" className="btn btn--primary" disabled={busy}>Сохранить</button>

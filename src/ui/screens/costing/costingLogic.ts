@@ -2,6 +2,8 @@
 // Выбор заказов — только фильтр показа: движок считает всё по всем данным (R18.1).
 
 import { compareOrders, orderLabel, orderRef } from '../../../domain/numbering';
+import { F } from '../../../domain/labels';
+import { unitOf } from '../../format';
 import { AD_LABEL, AW_LABEL } from '../orders/coefLabels';
 import { COST_CATEGORIES, COST_CATEGORY_LABEL, type BatchCost, type CostCategory, type CostWarning, type CostingResult, type LineCost } from '../../../domain/costing';
 import type { Dataset, ISODate, Line, Order, Supplier, SupplierOrder } from '../../../domain/model';
@@ -147,8 +149,8 @@ const r2 = (n: number | null | undefined): number | null => (n === null || n ===
 export function buildReportRows(ds: Dataset, rows: CostingRow[], selected: ReadonlySet<string>, today: ISODate): ReportRow[] {
   const numbers = ds.orders.filter((o) => selected.has(o.id)).sort(compareOrders).map(orderLabel).join(', ');
   const header = [
-    'Заказ', 'Поставщик', '№', 'Позиция', 'Кол-во', 'Цена в валюте', 'Валюта', 'Цена ₽/шт', 'Прогноз ₽/шт', AD_LABEL,
-    'Себестоимость позиции, ₽', 'Себестоимость за единицу, ₽', AW_LABEL, 'Отклонение, %', 'Статус',
+    'Заказ', F.supplier, '№', 'Позиция', F.qty, F.unit, F.unitPrice, F.currency, `${F.priceRub}, ₽`, `${F.forecast}, ₽`, AD_LABEL,
+    'Себестоимость позиции, ₽', `${F.costUnit}, ₽`, AW_LABEL, `${F.deviation}, %`, F.status,
     ...COST_CATEGORIES.map((k) => `${COST_CATEGORY_LABEL[k]}, ₽`),
   ];
   const out: ReportRow[] = [
@@ -165,7 +167,7 @@ export function buildReportRows(ds: Dataset, rows: CostingRow[], selected: Reado
     total += c.total;
     for (const k of COST_CATEGORIES) sum[k] += c.breakdown[k];
     out.push([
-      r.order.code?.trim() || r.order.number, r.supplier?.name ?? '', r.line.seq, lineTitle(r.line), r.line.qty, r2(r.line.unitPrice), r.so?.currency ?? '',
+      r.order.code?.trim() || r.order.number, r.supplier?.name ?? '', r.line.seq, lineTitle(r.line), r.line.qty, unitOf(r.line), r2(r.line.unitPrice), r.so?.currency ?? '',
       r2(c.Y), r2(c.AB), r2(c.AD), r2(c.total), r2(c.AV), r2(c.AW), r2(r.deviationPct), c.provisional ? 'предварительно' : 'закрыт',
       ...COST_CATEGORIES.map((k) => r2(c.breakdown[k])),
     ]);

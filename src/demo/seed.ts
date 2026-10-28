@@ -1,6 +1,7 @@
 // Синтетический набор для демо-режима. Все названия, люди и числа выдуманы и помечены «Демо».
 
 import type { Dataset, ListItem, ListKey, Rate } from '../domain/model';
+import { DEFAULT_UNITS } from '../domain/labels';
 import { DEFAULT_SHIPMENT_TYPES } from '../domain/shipmentTypes';
 import { applyGeoSeed, GEO_VERSION, planGeoSeed, type GeoData } from '../data/geo';
 
@@ -32,6 +33,7 @@ export function demoSeed(): Partial<Dataset> {
       ...list('direction', ['Трубопроводная арматура', 'Электрика']),
       ...list('specialization', ['Краны', 'Кабель']),
       ...list('paymentTerms', ['30/70', '100 % предоплата']),
+      ...list('unit', [...DEFAULT_UNITS]),
     ],
     // G20/G21: справочник Китая — как в новой таблице (страна, 33 провинции, города с провинцией).
     ...chinaGeo(),

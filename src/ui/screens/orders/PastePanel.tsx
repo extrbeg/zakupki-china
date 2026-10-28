@@ -2,6 +2,7 @@
 // Разбор — чистая функция parsePastedLines.
 
 import { useMemo, useState } from 'react';
+import { F, SHORT } from '../../../domain/labels';
 import { newId } from '../../../domain/ids';
 import type { Line, Order, SupplierOrder } from '../../../domain/model';
 import { useData } from '../../DataContext';
@@ -57,8 +58,8 @@ export function PastePanel({ order, so, nextSeq, initialText, onClose }: {
           <table className="table" aria-label="Предпросмотр вставки">
             <thead>
               <tr>
-                <th scope="col">Строка</th><th scope="col">Товар</th><th scope="col" className="num">Кол-во</th><th scope="col" className="num">Цена</th>
-                <th scope="col">HS-код</th><th scope="col" className="num">CBM</th><th scope="col" className="num">Вес</th><th scope="col">Статус</th>
+                <th scope="col">Строка</th><th scope="col">Товар</th><th scope="col" className="num">Кол-во</th><th scope="col" className="num">{SHORT.unitPrice}</th>
+                <th scope="col">HS-код</th><th scope="col" className="num">CBM</th><th scope="col" className="num">{F.weight}</th><th scope="col">Статус</th>
               </tr>
             </thead>
             <tbody>

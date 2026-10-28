@@ -1,6 +1,7 @@
 // Экран «Поставки» (маршрут /shipments): список поставок и переход к созданию.
 
 import { useMemo } from 'react';
+import { F } from '../../../domain/labels';
 import { Link, useNavigate } from 'react-router-dom';
 import type { Shipment } from '../../../domain/model';
 import { useData } from '../../DataContext';
@@ -26,11 +27,11 @@ export default function ShipmentsScreen() {
 
   const columns: DataColumn<Shipment>[] = [
     {
-      key: 'number', header: 'Поставка',
+      key: 'number', header: F.shipmentNumber,
       render: (s) => <Link to={`/shipments/${s.id}`} onClick={(e) => e.stopPropagation()}>{s.number}</Link>,
     },
-    { key: 'mode', header: 'Тип', render: (s) => shipmentTypeOf(ds, s)?.name ?? MODE_LABEL[s.mode] ?? s.mode },
-    { key: 'container', header: 'Контейнер / накладная', render: (s) => s.containerNo ?? '' },
+    { key: 'mode', header: F.shipmentType, render: (s) => shipmentTypeOf(ds, s)?.name ?? MODE_LABEL[s.mode] ?? s.mode },
+    { key: 'container', header: F.containerNo, render: (s) => s.containerNo ?? '' },
     { key: 'carrier', header: 'Перевозчик', render: (s) => ds.carriers.find((c) => c.id === s.carrierId)?.name ?? '' },
     { key: 'sent', header: 'Отправка в РФ', render: (s) => formatDate(s.sentDate) },
     { key: 'arrival', header: 'Прибытие на СВХ', render: (s) => formatDate(s.arrivalDate) },

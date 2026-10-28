@@ -70,8 +70,8 @@ describe('SheetsStore: формат записи', () => {
     expect(rawWrites.filter((c) => c.values?.flat().some((v) => v === 60.5))).not.toHaveLength(0);
     for (const c of rawWrites.filter((c) => c.values?.flat().some((v) => v === 60.5))) expect(c.input).toBe('RAW');
     const lines = fake.values(SP, 'Позиции');
-    expect(lines[1][col(fake, 'Позиции', 'Цена в валюте')]).toBe(60.5);
-    expect(lines[1][col(fake, 'Позиции', 'Закупка')]).toBe(true);
+    expect(lines[1][col(fake, 'Позиции', 'Цена за единицу')]).toBe(60.5);
+    expect(lines[1][col(fake, 'Позиции', 'В работу')]).toBe(true);
     const orders = fake.values(SP, 'Заказы');
     expect(orders[1][col(fake, 'Заказы', 'Дата заказа')]).toBe(dateToSerial('2026-10-01'));
     expect(orders[1][col(fake, 'Заказы', 'Дата заказа')]).toBe(46296);
@@ -119,7 +119,7 @@ describe('SheetsStore: формат записи', () => {
     await new SheetsStore(fake, SP).update('suppliers', { id: 'sup_1', name: 'Новое' });
     const rows = fake.values(SP, 'Поставщики');
     expect(rows[1][1]).toBe('моё');
-    expect(rows[1][col(fake, 'Поставщики', 'Компания')]).toBe('Новое');
+    expect(rows[1][col(fake, 'Поставщики', 'Название')]).toBe('Новое');
   });
 
   it('недостающий лист читается как пустой', async () => {

@@ -6,7 +6,7 @@ import { LocalStore } from '../../../src/store/localStore';
 import type { Cost, Dataset, Rate } from '../../../src/domain/model';
 import CostsScreen from '../../../src/ui/screens/costs/CostsScreen';
 import { computeCosting } from '../../../src/domain/costing';
-import { pickSuggestion } from '../components/suggest';
+import { pickByValue, pickSuggestion, suggestionValues } from '../components/suggest';
 
 let counter = 0;
 
@@ -56,8 +56,14 @@ const seed: Partial<Dataset> = {
   declarations: [{ id: 'd1', shipmentId: 'sh1', number: '10702/1' }],
 };
 
-const field = (label: RegExp | string) => screen.getByLabelText(label) as HTMLInputElement;
-const set = (label: RegExp | string, value: string) => fireEvent.change(field(label), { target: { value } });
+/** Поле по подписи; открыта форма — в форме (у фильтров журнала те же подписи). */
+const field = (label: RegExp | string) => {
+  const form = screen.queryByRole('form');
+  return (form ? within(form) : screen).getByLabelText(label) as HTMLInputElement;
+};
+const set = (label: RegExp | string, value: string) => { fireEvent.change(field(label), { target: { value } }); fireEvent.blur(field(label)); };
+/** Выбор записи (заказ, поставщик, поставка) в поле с поиском — по id. */
+const choose = (label: RegExp | string, id: string) => pickByValue(field(label), id);
 
 async function openNew() {
   fireEvent.click(await screen.findByRole('button', { name: 'Добавить затрату' }));
@@ -66,7 +72,7 @@ async function openNew() {
 /** Факт на поставщика so1 в юанях, тип «Аванс», с датой оплаты. */
 function fillFactCny(paymentDate: string) {
   set(/^Привязка/, 'supplierOrder');
-  set(/^Объект привязки/, 'so1');
+  choose(/^Объект привязки/, 'so1');
   set(/^Тип затраты/, 'Аванс');
   set(/^Валюта/, 'CNY');
   set(/^Дата оплаты/, paymentDate);
@@ -118,7 +124,7 @@ describe('форма затраты: автокурс', () => {
     const { store } = renderCosts(seed);
     await openNew();
     set(/^Привязка/, 'order');
-    set(/^Объект привязки/, 'o12');
+    choose(/^Объект привязки/, 'o12');
     set(/^Тип затраты/, 'Свой тип');
     set(/^Валюта/, 'RUB');
     set(/^Дата оплаты/, '2026-10-24');
@@ -205,7 +211,7 @@ describe('сохранённая затрата: курс не перезапи�
     set(/^Дата оплаты/, '2026-10-20');
     expect(field(/^Курс/).value).toBe('11');
     set(/^Привязка/, 'supplierOrder');
-    set(/^Объект привязки/, 'so1');
+    choose(/^Объект привязки/, 'so1');
     expect(field(/^Курс/).value).toBe('11');
     expect(screen.getByText(/курс вручную/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
@@ -247,7 +253,7 @@ describe('сохранённая затрата: курс не перезапи�
     fireEvent.click((await screen.findByText('фикс')).closest('tr') as HTMLElement);
     expect(field(/^Курс/).value).toBe('11,45');
     set(/^Привязка/, 'supplierOrder');
-    set(/^Объект привязки/, 'so1');
+    choose(/^Объект привязки/, 'so1');
     expect(field(/^Курс/).value).toBe('11,45');
     set(/^Статус/, 'plan');
     set(/^Статус/, 'fact');
@@ -302,7 +308,7 @@ describe('форма затраты: план и факт', () => {
     await openNew();
     set(/^Статус/, 'plan');
     set(/^Привязка/, 'supplierOrder');
-    set(/^Объект привязки/, 'so1');
+    choose(/^Объект привязки/, 'so1');
     set(/^Тип затраты/, 'Аванс');
     set(/^Валюта/, 'CNY');
     set(/^Сумма в валюте/, '100');
@@ -323,7 +329,7 @@ describe('форма затраты: план и факт', () => {
     await openNew();
     set(/^Статус/, 'plan');
     set(/^Привязка/, 'supplierOrder');
-    set(/^Объект привязки/, 'so2');
+    choose(/^Объект привязки/, 'so2');
     expect((field(/^Валюта/) as unknown as HTMLSelectElement).value).toBe('USD');
     set(/^Сумма в валюте/, '10');
     expect(field(/^Курс/).value).toBe('80');
@@ -360,12 +366,13 @@ describe('форма затраты: тип, получатель, реквиз�
   it('тип затраты — свои из списка и стандартные; получатель — из справочника или текстом', async () => {
     const { store } = renderCosts(seed);
     await openNew();
-    const types = Array.from((field(/^Тип затраты/) as unknown as HTMLSelectElement).options).map((o) => o.value);
-    expect(types).toEqual(expect.arrayContaining(['Аванс', 'Свой тип', 'Пошлина', 'НДС', 'Комиссия агента', 'СВХ']));
-    expect(types.filter((t) => t === 'Аванс')).toHaveLength(1);
+    const typesFor = (q: string) => { fireEvent.change(field(/^Тип затраты/), { target: { value: q } }); return suggestionValues(field(/^Тип затраты/)); };
+    for (const t of ['Аванс', 'Свой тип', 'Пошлина', 'НДС', 'Комиссия агента', 'СВХ']) expect(typesFor(t)).toContain(t);
+    expect(typesFor('Аванс').filter((t) => t === 'Аванс')).toHaveLength(1);
+    fireEvent.blur(field(/^Тип затраты/));
 
     set(/^Привязка/, 'shipment');
-    set(/^Объект привязки/, 'sh1');
+    choose(/^Объект привязки/, 'sh1');
     set(/^Тип затраты/, 'Комиссия агента');
     set(/^Кому платим/, 'agent');
     pickSuggestion(screen.getByLabelText(/^Получатель/), 'Агент Один');
@@ -390,7 +397,7 @@ describe('форма затраты: тип, получатель, реквиз�
     const { store } = renderCosts(seed);
     await openNew();
     set(/^Привязка/, 'declaration');
-    set(/^Объект привязки/, 'd1');
+    choose(/^Объект привязки/, 'd1');
     set(/^Тип затраты/, 'Брокер');
     set(/^Кому платим/, 'text');
     set(/^Получатель \(текстом\)/, 'ООО Брокер');
@@ -416,7 +423,7 @@ describe('журнал затрат', () => {
     renderCosts({ ...seed, costs });
     await screen.findByText('первый');
     const headers = screen.getAllByRole('columnheader').map((h) => h.textContent);
-    expect(headers).toEqual(['Номер', 'Дата заполнения', 'Дата оплаты', 'Статус', 'Привязка', 'Тип', 'Кому платим', 'Исполнитель', 'Счёт', 'Сумма', 'Валюта', 'Курс', 'Сумма, ₽', 'Комментарий']);
+    expect(headers).toEqual(['Номер затраты', 'Дата заполнения', 'Дата оплаты', 'Статус', 'Привязка', 'Тип затраты', 'Кому платим', 'Исполнитель операции', 'Номер счёта', 'Сумма в валюте', 'Валюта', 'Курс', 'Сумма в рублях', 'Комментарий']);
     expect(visible()).toHaveLength(4);
     const row4 = screen.getByText('четвёртый').closest('tr') as HTMLElement;
     expect(within(row4).getByText(/вручную/)).toBeTruthy();
@@ -426,15 +433,15 @@ describe('журнал затрат', () => {
   it('фильтры: заказ, поставка, тип, план/факт, период', async () => {
     renderCosts({ ...seed, costs });
     await screen.findByText('первый');
-    set('Заказ', 'o12');
+    choose('Заказ', 'o12');
     expect(visible()).toEqual(['первый']);
-    set('Заказ', '');
-    set('Поставка', 'sh1');
+    choose('Заказ', '');
+    choose('Поставка', 'sh1');
     expect(visible()).toEqual(['второй', 'третий']);
-    set('Поставка', '');
-    set('Тип', 'Аванс');
+    choose('Поставка', '');
+    set('Тип затраты', 'Аванс');
     expect(visible()).toEqual(['первый', 'четвёртый']);
-    set('Тип', '');
+    set('Тип затраты', '');
     set('План/факт', 'plan');
     expect(visible()).toEqual(['третий']);
     set('План/факт', '');
@@ -469,10 +476,10 @@ describe('номер затраты (G33)', () => {
     const { store } = renderCosts({ ...seed, costs: [baseCost({ id: 'c0', code: 'Р-2026-12-004' })] });
     await openNew();
     set(/^Привязка/, 'supplierOrder');
-    set(/^Объект привязки/, 'so1');
+    choose(/^Объект привязки/, 'so1');
     expect(field(/^Номер затраты/).value).toBe('Р-2026-12-005');
     set(/^Привязка/, 'shipment');
-    set(/^Объект привязки/, 'sh1');
+    choose(/^Объект привязки/, 'sh1');
     expect(field(/^Номер затраты/).value).toBe('Р-2026-ПК-7-001');
     set(/^Тип затраты/, 'Аванс');
     set(/^Сумма в валюте/, '100');
@@ -488,7 +495,7 @@ describe('номер затраты (G33)', () => {
     expect(within(row).getByText('Р-2026-12-001')).toBeTruthy();
     fireEvent.click(row);
     set(/^Привязка/, 'order');
-    set(/^Объект привязки/, 'o6');
+    choose(/^Объект привязки/, 'o6');
     expect(field(/^Номер затраты/).value).toBe('Р-2026-12-001');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(async () => expect((await store.load()).costs[0].targetId).toBe('o6'));
@@ -499,7 +506,7 @@ describe('номер затраты (G33)', () => {
     const { store } = renderCosts({ ...seed, costs: [baseCost({ id: 'c1', code: 'Р-2026-12-001', amount: 10, paymentDate: '2026-10-01' })] });
     await openNew();
     set(/^Привязка/, 'order');
-    set(/^Объект привязки/, 'o12');
+    choose(/^Объект привязки/, 'o12');
     set(/^Тип затраты/, 'Аванс');
     set(/^Сумма в валюте/, '5');
     set(/^Дата оплаты/, '2026-10-25');

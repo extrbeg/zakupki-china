@@ -64,8 +64,8 @@ describe('блок поставщика: заголовок и таблица т
     const table = await screen.findByRole('table', { name: 'Товары 12-1' });
     const heads = within(table).getAllByRole('columnheader').map((th) => (th.textContent ?? '').replace(/\s+/g, ' ').trim());
     expect(heads.slice(0, 15)).toEqual([
-      'В работу', '№', 'Товар', 'Кол-во', 'Цена, CNY', 'Сумма, CNY', 'Цена ₽/шт', 'Сумма ₽', 'Расч. коэфф.',
-      'Прогноз ₽/шт', 'Прогноз ₽ на кол-во', 'Себест. ₽/шт', 'Себест. ₽ на кол-во', 'Факт. коэфф.', 'Откл.',
+      'В работу', '№', 'Товар', 'Кол-во', 'Цена за ед., CNY', 'Сумма, CNY', 'Цена ₽/ед.', 'Сумма ₽', 'Расч. коэфф.',
+      'Прогноз ₽/ед.', 'Прогноз ₽ на кол-во', 'Себест. ₽/ед.', 'Себест. ₽ на кол-во', 'Факт. коэфф.', 'Откл.',
     ]);
   });
 
@@ -73,7 +73,7 @@ describe('блок поставщика: заголовок и таблица т
     renderAt('/orders/o12', adSeed());
     await screen.findByText('Задвижка');
     const r1 = screen.getByTestId('line-ln1');
-    expect([cell(r1, 'qty'), cell(r1, 'price'), cell(r1, 'X'), cell(r1, 'Y'), cell(r1, 'Z')]).toEqual(['1000', '5,00', '5000,00', '50,00', '50000,00']);
+    expect([cell(r1, 'qty'), cell(r1, 'price'), cell(r1, 'X'), cell(r1, 'Y'), cell(r1, 'Z')]).toEqual(['1000шт', '5,00', '5000,00', '50,00', '50000,00']);
     expect([adShown(r1), cell(r1, 'AB'), cell(r1, 'ABqty')]).toEqual(['1,5', '75,00', '75000,00']);
     expect([cell(r1, 'AV'), cell(r1, 'AVqty')]).toEqual(['50,00', '50000,00']);
     expect(cell(r1, 'AW')).toMatch(/^1,00/);
@@ -216,7 +216,7 @@ describe('«Подробнее» — полная форма позиции', ()
     await screen.findByText('Задвижка');
     fireEvent.click(within(block('12-1')).getByRole('button', { name: 'Подробнее о позиции 1' }));
     const form = screen.getByRole('form', { name: 'Позиция' });
-    for (const label of [/^Название от заказчика/, /^Тех\. параметры/, /^Название в документах/, /^Название у поставщика/, /^Кол-во/, /^Цена в валюте/, /^HS-код/, /^Пошлина/, /^Упаковка/, /^Размер упаковки/, /^CBM/, /^Вес/, /^Мест/, /^Расчётный коэффициент себестоимости доставки/, /^Комментарий/]) {
+    for (const label of [/^Название от заказчика/, /^Тех\. параметры/, /^Название в документах/, /^Название у поставщика/, /^Кол-во/, /^Цена за единицу/, /^HS-код/, /^Пошлина/, /^Упаковка/, /^Размер упаковки/, /^CBM/, /^Вес/, /^Мест/, /^Расчётный коэффициент себестоимости доставки/, /^Комментарий/]) {
       expect(within(form).getByLabelText(label)).toBeTruthy();
     }
     expect(within(form).getByLabelText('В работу')).toBeTruthy();
@@ -407,11 +407,11 @@ describe('флажок «В работу» в строке таблицы тов
 describe('таблица товаров на ноутбуке (≈1024 px)', () => {
   // На 769–1279 px скрываются колонки с классом lines-col--minor (orders.css). Цена ₽/шт, прогноз ₽/шт и себестоимость ₽/шт —
   // главное для пользователя, они не скрываются; вместо них скрываются суммы «на кол-во».
-  it('колонки ₽/шт (Y, AB, AV) не скрываются; скрываются суммы «на кол-во» (Z, AB на кол-во, AV на кол-во)', async () => {
+  it('колонки за единицу (цена в ₽, прогноз, себестоимость) не скрываются; скрываются суммы «на кол-во» (Z, AB на кол-во, AV на кол-во)', async () => {
     renderAt('/orders/o12', adSeed());
     const table = await screen.findByRole('table', { name: 'Товары 12-1' });
     const head = (title: string) => within(table).getAllByRole('columnheader').find((th) => (th.textContent ?? '').trim() === title) as HTMLElement;
-    for (const title of ['Цена ₽/шт', 'Прогноз ₽/шт', 'Себест. ₽/шт']) expect(head(title).classList.contains('lines-col--minor')).toBe(false);
+    for (const title of ['Цена ₽/ед.', 'Прогноз ₽/ед.', 'Себест. ₽/ед.']) expect(head(title).classList.contains('lines-col--minor')).toBe(false);
     for (const title of ['Сумма ₽', 'Прогноз ₽ на кол-во', 'Себест. ₽ на кол-во']) expect(head(title).classList.contains('lines-col--minor')).toBe(true);
     const r1 = screen.getByTestId('line-ln1');
     for (const col of ['Y', 'AB', 'AV']) expect(r1.querySelector(`[data-col="${col}"]`)?.closest('td')?.classList.contains('lines-col--minor')).toBe(false);
@@ -429,14 +429,15 @@ describe('таблица товаров на ноутбуке (≈1024 px)', () 
 });
 
 describe('названия коэффициентов (G22)', () => {
-  it('шапка таблицы: «Расч. коэфф.» / «Факт. коэфф.», полное название — в подсказке; буквы AD и AW — только в скобках', async () => {
+  it('шапка таблицы: «Расч. коэфф.» / «Факт. коэфф.», полное название — в подсказке; букв AD и AW нет', async () => {
     renderAt('/orders/o12', adSeed());
     const table = await screen.findByRole('table', { name: 'Товары 12-1' });
     const heads = within(table).getAllByRole('columnheader');
     const ad = heads.find((th) => th.textContent === 'Расч. коэфф.') as HTMLElement;
     const aw = heads.find((th) => th.textContent === 'Факт. коэфф.') as HTMLElement;
-    expect(ad.title).toMatch(/^Расчётный коэффициент себестоимости доставки \(AD\)/);
-    expect(aw.title).toMatch(/^Фактический коэффициент себестоимости доставки \(AW\)/);
+    expect(ad.title).toMatch(/^Расчётный коэффициент себестоимости доставки: /);
+    expect(aw.title).toMatch(/^Фактический коэффициент себестоимости доставки: /);
+    expect(`${ad.title} ${aw.title}`).not.toMatch(/\b(AD|AW)\b/);
     expect(heads.some((th) => th.textContent === 'AD' || th.textContent === 'AW')).toBe(false);
   });
 

@@ -7,7 +7,7 @@ import { orderShipmentShares } from '../../../domain/costShares';
 import type { Batch, Order, Shipment } from '../../../domain/model';
 import { shipmentTypeOf } from '../../../domain/shipmentTypes';
 import { useData } from '../../DataContext';
-import { EMPTY, MODE_LABEL, formatDate, formatMoney, formatQty } from '../../format';
+import { EMPTY, MODE_LABEL, formatDate, formatMoney, formatQty, formatQtyUnit, unitOf } from '../../format';
 import { formatSharePct } from '../costs/splitText';
 import { SendToShipment, type SendResult } from '../shipments/SendToShipment';
 import { lineTitle, sendableLines } from '../shipments/sendLogic';
@@ -101,7 +101,7 @@ export function OrderShipments({ order }: { order: Order }) {
                         <td style={{ textAlign: 'right' }}>{formatQty(b.qty)}</td>
                         <td style={{ textAlign: 'right' }}>{formatQty(b.cbm ?? d.cbm)}</td>
                         <td style={{ textAlign: 'right' }}>{formatQty(b.weight ?? d.weight)}</td>
-                        <td style={{ textAlign: 'right' }}>{formatQty(shipped)} из {formatQty(line.qty)}</td>
+                        <td style={{ textAlign: 'right' }}>{formatQty(shipped)} из {formatQtyUnit(line.qty, unitOf(line))}</td>
                         <td style={{ textAlign: 'right' }}>{formatQty(Math.max(0, line.qty - shipped))}</td>
                       </tr>
                     );

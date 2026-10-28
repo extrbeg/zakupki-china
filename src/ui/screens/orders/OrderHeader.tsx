@@ -2,6 +2,8 @@
 // Дата расчёта и флаг «Все затраты внесены» у существующего заказа сохраняются сразу — итоги пересчитываются без нажатия «Сохранить».
 
 import { useState } from 'react';
+import { F } from '../../../domain/labels';
+import { pastValues } from '../../directories/records';
 import { useNavigate } from 'react-router-dom';
 import { newId } from '../../../domain/ids';
 import type { Order } from '../../../domain/model';
@@ -101,9 +103,9 @@ export function OrderHeader({ order }: { order?: Order }) {
           {pick('department', 'Подразделение')}
           {pick('payer', 'Плательщик')}
           {pick('customer', 'Заказчик')}
-          <TextField label="Название" value={draft.title} onChange={(v) => patch({ title: v })} />
+          <TextField label={F.name} value={draft.title} onChange={(v) => patch({ title: v })} suggestions={pastValues(ds.orders, 'title')} />
           <div>
-            <TextField label="ID задачи Битрикс24" value={draft.bitrixTaskId} onChange={(v) => patch({ bitrixTaskId: v })} />
+            <TextField label={F.bitrixTaskId} value={draft.bitrixTaskId} onChange={(v) => patch({ bitrixTaskId: v })} suggestions={pastValues(ds.orders, 'bitrixTaskId')} />
             {link ? <a className="order-link" href={link} target="_blank" rel="noreferrer">Задача {draft.bitrixTaskId.trim()} в Битрикс24</a> : null}
           </div>
           <DateField

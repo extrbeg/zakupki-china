@@ -3,11 +3,12 @@
 // Фильтр «Заказ» показывает и доли затрат поставок, легшие на заказ (G31): строка «доля поставки П-…» с рублями доли.
 
 import { useMemo, useState } from 'react';
+import { F } from '../../../domain/labels';
 import { useSearchParams } from 'react-router-dom';
 import { orderShipmentCostsWithoutRub, orderShipmentShares } from '../../../domain/costShares';
 import type { Cost, CostStatus, CostTargetType, ISODate } from '../../../domain/model';
 import { useData } from '../../DataContext';
-import { DataTable, DateField, EmptyState, SelectField, type DataColumn } from '../../components';
+import { AddableSelect, DataTable, DateField, EmptyState, SelectField, type DataColumn } from '../../components';
 import { CURRENCY_LABEL, formatMoney, formatRate, ruDate } from '../../format';
 import { formatSharePct } from './splitText';
 import { CostForm, type CostFormPreset } from './CostForm';
@@ -76,7 +77,7 @@ export default function CostsScreen() {
   }, [rows, rubById]);
 
   const columns: DataColumn<Row>[] = useMemo(() => [
-    { key: 'code', header: 'Номер', render: ({ cost: c }) => c.code ?? '' },
+    { key: 'code', header: F.costCode, render: ({ cost: c }) => c.code ?? '' },
     { key: 'entryDate', header: 'Дата заполнения', render: ({ cost: c }) => ruDate(c.entryDate) },
     { key: 'paymentDate', header: 'Дата оплаты', render: ({ cost: c }) => ruDate(c.paymentDate) },
     {
@@ -98,14 +99,14 @@ export default function CostsScreen() {
         );
       },
     },
-    { key: 'costType', header: 'Тип', render: ({ cost: c }) => c.costType },
+    { key: 'costType', header: F.costType, render: ({ cost: c }) => c.costType },
     { key: 'payee', header: 'Кому платим', render: ({ cost: c }) => payeeLabel(ds, c) },
-    { key: 'executor', header: 'Исполнитель', render: ({ cost: c }) => c.executor ?? '' },
+    { key: 'executor', header: F.executor, render: ({ cost: c }) => c.executor ?? '' },
     {
-      key: 'invoice', header: 'Счёт',
+      key: 'invoice', header: F.invoiceNumber,
       render: ({ cost: c }) => [c.invoiceNumber, c.invoiceDate ? `от ${ruDate(c.invoiceDate)}` : ''].filter(Boolean).join(' '),
     },
-    { key: 'amount', header: 'Сумма', align: 'right', render: ({ cost: c }) => <span className="num">{formatMoney(c.amount)}</span> },
+    { key: 'amount', header: F.amount, align: 'right', render: ({ cost: c }) => <span className="num">{formatMoney(c.amount)}</span> },
     { key: 'currency', header: 'Валюта', render: ({ cost: c }) => CURRENCY_LABEL[c.currency] ?? c.currency },
     {
       key: 'rate', header: 'Курс', align: 'right',
@@ -126,7 +127,7 @@ export default function CostsScreen() {
       },
     },
     {
-      key: 'rub', header: 'Сумма, ₽', align: 'right',
+      key: 'rub', header: F.amountRub, align: 'right',
       render: ({ cost: c, share }) => {
         if (share) return share.rub === null ? <span className="muted">—</span> : <span className="num" data-testid="share-rub">{formatMoney(share.rub)}</span>;
         const rub = rubById.get(c.id)?.rub;
@@ -165,9 +166,9 @@ export default function CostsScreen() {
       {status !== 'loading' && ds.costs.length > 0 ? (
         <>
           <div className="ui-toolbar">
-            <SelectField label="Заказ" value={filters.order} options={orderOptions} placeholder="Все" onChange={(v) => setFilter({ order: v })} />
-            <SelectField label="Поставка" value={filters.shipment} options={shipmentOptions} placeholder="Все" onChange={(v) => setFilter({ shipment: v })} />
-            <SelectField label="Тип" value={filters.costType} options={typeOptions} placeholder="Все" onChange={(v) => setFilter({ costType: v })} />
+            <AddableSelect search label="Заказ" value={filters.order} options={orderOptions} placeholder="Все" onChange={(v) => setFilter({ order: v })} />
+            <AddableSelect search label="Поставка" value={filters.shipment} options={shipmentOptions} placeholder="Все" onChange={(v) => setFilter({ shipment: v })} />
+            <AddableSelect search label="Тип затраты" value={filters.costType} options={typeOptions} placeholder="Все" onChange={(v) => setFilter({ costType: v })} />
             <SelectField
               label="План/факт" value={filters.status} placeholder="Все"
               options={[{ value: 'plan', label: 'План' }, { value: 'fact', label: 'Факт' }]}

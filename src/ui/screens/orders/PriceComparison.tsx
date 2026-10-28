@@ -7,7 +7,7 @@ import { useMemo, useRef, type MouseEvent } from 'react';
 import type { Currency, Order } from '../../../domain/model';
 import { useData } from '../../DataContext';
 import { ErrorBanner } from '../../components';
-import { EMPTY, formatMoney, formatNumber, formatQty } from '../../format';
+import { EMPTY, formatMoney, formatNumber, formatQtyUnit, unitOf } from '../../format';
 import { buildCompareMatrix, type CompareColumn, type Offer, type OfferTotals } from './compareLogic';
 import { usePurchased } from './purchasedQueue';
 
@@ -46,12 +46,12 @@ export function PriceComparison({ order }: { order: Order }) {
         {o.best ? <span className="cmp-best">лучший прогноз</span> : null}
       </span>
       <span className="cmp-offer__main">
-        <span data-col="qty">{formatQty(o.line.qty)} шт</span>
+        <span data-col="qty">{formatQtyUnit(o.line.qty, unitOf(o.line))}</span>
         {' × '}
         <span data-col="price">{formatNumber(o.line.unitPrice)} {col.so.currency}</span>
       </span>
-      <span className="cmp-offer__rub"><span data-col="Y">{o.Y === null ? EMPTY : `${formatMoney(o.Y)} ₽/шт`}</span></span>
-      <span className="cmp-offer__ab">прогноз <span data-col="AB">{o.AB === null ? EMPTY : `${formatMoney(o.AB)} ₽/шт`}</span></span>
+      <span className="cmp-offer__rub"><span data-col="Y">{o.Y === null ? EMPTY : `${formatMoney(o.Y)} ₽/${unitOf(o.line)}`}</span></span>
+      <span className="cmp-offer__ab">прогноз <span data-col="AB">{o.AB === null ? EMPTY : `${formatMoney(o.AB)} ₽/${unitOf(o.line)}`}</span></span>
     </label>
   );
 

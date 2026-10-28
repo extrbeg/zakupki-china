@@ -104,8 +104,8 @@ export { formatPct } from '../../format';
 const pointsWord = (n: number): string => (n % 10 === 1 && n % 100 !== 11 ? 'закрытой позиции' : 'закрытым позициям');
 
 const BASIS_TEXT: Record<CoefSuggestion['basis'], string> = {
-  'supplier+mode': 'этого поставщика и типа доставки',
-  mode: 'этого типа доставки',
+  'supplier+mode': 'этого поставщика и типа поставки',
+  mode: 'этого типа поставки',
   all: 'всех поставщиков',
   none: '',
 };

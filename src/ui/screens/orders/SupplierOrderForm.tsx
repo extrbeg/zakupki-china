@@ -1,20 +1,24 @@
-// Реквизиты поставщика в заказе: поставщик, валюта, дата расчёта и ручной курс, условия оплаты, доставка, даты, Битрикс, комментарий.
+// Реквизиты поставщика в заказе: поставщик, валюта, дата расчёта и ручной курс, условия оплаты, тип поставки, даты, Битрикс, комментарий.
 // У существующего блока свёрнуты под кнопкой «Реквизиты поставщика»; у нового — открыты сразу.
 // Дата расчёта у существующего поставщика сохраняется сразу (итоги пересчитываются), остальное — по кнопке.
 
 import { useState } from 'react';
+import { F } from '../../../domain/labels';
+import { pastValues } from '../../directories/records';
 import { newId } from '../../../domain/ids';
 import { calcRateFor, effectiveCalcDate } from '../../../domain/lineFigures';
-import type { Currency, ISODate, Order, ShipmentMode, SupplierOrder } from '../../../domain/model';
+import type { Currency, ISODate, Order, SupplierOrder } from '../../../domain/model';
+import { modeForType, plannedTypeIdOf } from '../../../domain/shipmentTypes';
 import { useData } from '../../DataContext';
 import { ConfirmDelete, DateField, DirectorySelectField, ErrorBanner, Field, FormGrid, ListSelectField, NumberField, SelectField, TextField, isBadNumber } from '../../components';
-import { CURRENCY_OPTIONS, MODE_OPTIONS, formatDate, formatRate } from '../../format';
+import { ShipmentTypeField } from '../../directories/ShipmentTypeField';
+import { CURRENCY_OPTIONS, formatDate, formatRate } from '../../format';
 import { compact, plannedReadyDate, supplierOrderDeleteBlock } from './orderLogic';
 
 export const RATE_SOURCE_TEXT = { vtb: 'ВТБ', manual: 'введён вручную в «Курсах»', fixed: 'рубли' } as const;
 
 interface Draft {
-  supplierId?: string; currency: Currency; calcDate?: ISODate; calcRate?: number; paymentTerms?: string; plannedMode?: ShipmentMode;
+  supplierId?: string; currency: Currency; calcDate?: ISODate; calcRate?: number; paymentTerms?: string; plannedTypeId?: string;
   launchDate?: ISODate; productionDays?: number; actualReadyDate?: ISODate; bitrixTaskId: string; comment: string;
 }
 
@@ -23,7 +27,7 @@ export function SupplierOrderForm({ order, so, seq, onSaved }: { order: Order; s
   const { ds, today } = data;
   const [draft, setDraft] = useState<Draft>(() => ({
     supplierId: so?.supplierId, currency: so?.currency ?? 'CNY', calcDate: so?.calcDate, calcRate: so?.calcRate,
-    paymentTerms: so?.paymentTerms, plannedMode: so?.plannedMode, launchDate: so?.launchDate, productionDays: so?.productionDays,
+    paymentTerms: so?.paymentTerms, plannedTypeId: so ? plannedTypeIdOf(so) : undefined, launchDate: so?.launchDate, productionDays: so?.productionDays,
     actualReadyDate: so?.actualReadyDate, bitrixTaskId: so?.bitrixTaskId ?? '', comment: so?.comment ?? '',
   }));
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -78,7 +82,8 @@ export function SupplierOrderForm({ order, so, seq, onSaved }: { order: Order; s
         ...current,
         id: so?.id ?? newId('so'), orderId: order.id, seq,
         supplierId: draft.supplierId as string, currency: draft.currency, calcDate: draft.calcDate,
-        calcRate, paymentTerms: draft.paymentTerms, plannedMode: draft.plannedMode,
+        calcRate, paymentTerms: draft.paymentTerms,
+        plannedTypeId: draft.plannedTypeId, plannedMode: draft.plannedTypeId ? modeForType(draft.plannedTypeId) : undefined,
         launchDate: draft.launchDate, productionDays: days, actualReadyDate: draft.actualReadyDate,
         bitrixTaskId: draft.bitrixTaskId, comment: draft.comment,
       });
@@ -103,14 +108,17 @@ export function SupplierOrderForm({ order, so, seq, onSaved }: { order: Order; s
         />
         <NumberField label="Курс расчёта (вручную)" value={draft.calcRate} onChange={(v) => patch({ calcRate: v })} hint={rateHint} placeholder="авто" error={errors.calcRate} />
         <ListSelectField list="paymentTerms" label="Условия оплаты" value={draft.paymentTerms} placeholder="—" onChange={(v) => patch({ paymentTerms: v })} />
-        <SelectField label="План. тип доставки" value={draft.plannedMode} options={MODE_OPTIONS} placeholder="—" onChange={(v) => patch({ plannedMode: v as ShipmentMode | undefined })} />
+        <ShipmentTypeField value={draft.plannedTypeId} onChange={(v) => patch({ plannedTypeId: v })} />
         <DateField label="Дата запуска" value={draft.launchDate} onChange={(v) => patch({ launchDate: v })} />
         <NumberField label="Срок изготовления, дн" value={draft.productionDays} onChange={(v) => patch({ productionDays: v })} error={errors.productionDays} />
         <Field label="Плановая готовность" hint="дата запуска + срок изготовления">
           {({ id }) => <output id={id} className="readonly-value">{formatDate(ready)}</output>}
         </Field>
         <DateField label="Факт. готовность" value={draft.actualReadyDate} onChange={(v) => patch({ actualReadyDate: v })} />
-        <TextField label="ID задачи Битрикс24" value={draft.bitrixTaskId} onChange={(v) => patch({ bitrixTaskId: v })} />
+        <TextField
+          label={F.bitrixTaskId} value={draft.bitrixTaskId} onChange={(v) => patch({ bitrixTaskId: v })}
+          suggestions={[...new Set([...pastValues(ds.supplierOrders, 'bitrixTaskId'), ...pastValues(ds.orders, 'bitrixTaskId')])]}
+        />
         <TextField label="Комментарий" multiline value={draft.comment} onChange={(v) => patch({ comment: v })} />
       </FormGrid>
       <div className="ui-card__actions">

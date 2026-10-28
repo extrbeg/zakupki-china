@@ -67,10 +67,15 @@ async function guarded<T>(fn: () => Promise<T>): Promise<T> {
 
 const norm = (v: unknown) => String(v ?? '').trim();
 
-/** Индекс колонки листа для каждой колонки схемы (по заголовку); -1 — колонки нет. */
+/** Индекс колонки листа для каждой колонки схемы (по заголовку, иначе по прежнему названию — `aliases`); -1 — колонки нет. */
 export function mapHeaders(def: SheetDef, headerRow: unknown[]): number[] {
   const headers = headerRow.map(norm);
-  return def.columns.map((c) => headers.indexOf(c.header));
+  return def.columns.map((c) => {
+    const at = headers.indexOf(c.header);
+    if (at >= 0) return at;
+    for (const old of c.aliases ?? []) { const i = headers.indexOf(old); if (i >= 0) return i; }
+    return -1;
+  });
 }
 
 /** Строка листа → строка в порядке схемы. */

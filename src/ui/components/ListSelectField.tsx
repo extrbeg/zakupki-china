@@ -1,4 +1,4 @@
-// Поле выбора из «Списков» с пунктом «+ Добавить…» (история 85).
+// Поле выбора из «Списков» с поиском при вводе и пунктом «+ Добавить…» (история 85; правило полей со списком — AGENTS.md).
 // Новое значение сразу выбирается (onChange), запись в список (`ListItem`, в конец) идёт следом — форма не ждёт её
 // и ничего не сбрасывает. Значение, уже имеющееся среди вариантов без учёта регистра и пробелов, выбирается без записи.
 
@@ -63,7 +63,7 @@ export function ListSelectField({ list, options, onChange, ...rest }: ListSelect
 
   return (
     <AddableSelect
-      {...rest} options={shown} addError={addError} addLabel={ADD_LIST_VALUE_LABEL} inputLabel={`Новое значение: ${rest.label}`}
+      {...rest} search options={shown} addError={addError} addLabel={ADD_LIST_VALUE_LABEL} inputLabel={`Новое значение: ${rest.label}`}
       onChange={(v) => { setAddError(undefined); onChange(v); }} onAdd={add}
     />
   );

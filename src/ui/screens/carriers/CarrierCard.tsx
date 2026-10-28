@@ -1,11 +1,12 @@
 // Карточка перевозчика (история 64): создание и правка внутри экрана списка.
 
 import { useState } from 'react';
+import { F } from '../../../domain/labels';
 import { newId } from '../../../domain/ids';
 import type { Carrier } from '../../../domain/model';
 import { useData } from '../../DataContext';
 import { CheckboxField, ConfirmDelete, DateField, ErrorBanner, FormGrid, TextField } from '../../components';
-import { cleanRecord, validateName } from '../../directories/records';
+import { cleanRecord, validateName, pastValues } from '../../directories/records';
 import { carrierDeleteBlock } from '../../directories/usage';
 import '../../directories/directories.css';
 
@@ -20,6 +21,7 @@ export function CarrierCard({ carrier, onClose }: { carrier?: Carrier; onClose: 
   const text = (key: keyof Carrier) => ({
     value: draft[key] as string | undefined,
     onChange: (v: string) => setDraft((d) => ({ ...d, [key]: v })),
+    suggestions: pastValues(data.ds.carriers.filter((x) => x.id !== carrier?.id), key),   // прежние значения поля у других записей
   });
 
   const save = async () => {
@@ -42,23 +44,23 @@ export function CarrierCard({ carrier, onClose }: { carrier?: Carrier; onClose: 
       <h2 className="ui-card__title">{carrier ? carrier.name : 'Новый перевозчик'}</h2>
       {saveError !== undefined ? <ErrorBanner error={saveError} /> : null}
       <FormGrid>
-        <TextField label="Наименование" required error={errors.name} {...text('name')} />
-        <TextField label="Тип" {...text('type')} />
-        <TextField label="Специализация" {...text('specialization')} />
-        <TextField label="Контактное лицо" {...text('contactPerson')} />
-        <TextField label="Телефон" type="tel" {...text('phone')} />
-        <TextField label="Почта" type="email" {...text('email')} />
-        <TextField label="Сайт" type="url" {...text('website')} />
-        <TextField label="Договоры" multiline {...text('contracts')} />
+        <TextField label={F.name} required error={errors.name} {...text('name')} />
+        <TextField label={F.carrierType} {...text('type')} />
+        <TextField label={F.specialization} {...text('specialization')} />
+        <TextField label={F.contactPerson} {...text('contactPerson')} />
+        <TextField label={F.phone} type="tel" {...text('phone')} />
+        <TextField label={F.email} type="email" {...text('email')} />
+        <TextField label={F.website} type="url" {...text('website')} />
+        <TextField label={F.contracts} multiline {...text('contracts')} />
         <DateField
-          label="Срок действия договора" value={draft.contractValidUntil}
+          label={F.contractValidUntil} value={draft.contractValidUntil}
           onChange={(v) => setDraft((d) => ({ ...d, contractValidUntil: v }))}
         />
         <CheckboxField
-          label="Договор подписан" checked={draft.contractSigned ?? false}
+          label={F.contractSigned} checked={draft.contractSigned ?? false}
           onChange={(v) => setDraft((d) => ({ ...d, contractSigned: v }))}
         />
-        <TextField label="Комментарий" multiline className="ui-card__full" {...text('comment')} />
+        <TextField label={F.comment} multiline className="ui-card__full" {...text('comment')} />
       </FormGrid>
       <div className="ui-card__actions">
         <button type="submit" className="btn btn--primary" disabled={busy}>Сохранить</button>

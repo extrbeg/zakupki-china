@@ -1,6 +1,7 @@
 // Экран «Платёжные агенты» (маршрут /agents): список с поиском и карточка на этой же странице.
 
 import { useMemo, useState } from 'react';
+import { F } from '../../../domain/labels';
 import type { PaymentAgent } from '../../../domain/model';
 import { useData } from '../../DataContext';
 import { DataTable, EmptyState, TextField, type DataColumn } from '../../components';
@@ -11,7 +12,7 @@ import '../../directories/directories.css';
 type Open = { mode: 'new' } | { mode: 'edit'; id: string } | null;
 
 const columns: DataColumn<PaymentAgent>[] = [
-  { key: 'name', header: 'Наименование', render: (a) => a.name },
+  { key: 'name', header: F.name, render: (a) => a.name },
   { key: 'contactPerson', header: 'Контактное лицо', render: (a) => a.contactPerson ?? '' },
   { key: 'city', header: 'Город', render: (a) => [a.city, a.province].filter(Boolean).join(', ') },
   { key: 'phone', header: 'Телефон', render: (a) => a.phone ?? '' },

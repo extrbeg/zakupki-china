@@ -2,6 +2,7 @@
 // Затраты на поставки и декларации (общие для нескольких заказов) сюда не входят: они видны в карточке поставки.
 
 import { useMemo } from 'react';
+import { F } from '../../../domain/labels';
 import { Link } from 'react-router-dom';
 import type { Cost, Order } from '../../../domain/model';
 import { useData } from '../../DataContext';
@@ -40,11 +41,11 @@ export function PaymentFeed({ order }: { order: Order }) {
   type Row = (typeof rows)[number];
   const columns: DataColumn<Row>[] = [
     { key: 'date', header: 'Дата', render: (r) => formatDate(feedDate(r.cost)) },
-    { key: 'code', header: 'Номер', render: (r) => r.cost.code ?? '' },
-    { key: 'type', header: 'Тип затрат', render: (r) => r.cost.costType },
+    { key: 'code', header: F.costCode, render: (r) => r.cost.code ?? '' },
+    { key: 'type', header: F.costType, render: (r) => r.cost.costType },
     { key: 'target', header: 'Привязка', render: (r) => r.target },
-    { key: 'amount', header: 'Сумма', align: 'right', render: (r) => (r.cost.amount === undefined ? EMPTY : `${formatMoney(r.cost.amount)} ${r.cost.currency}`) },
-    { key: 'rub', header: 'В рублях', align: 'right', render: (r) => { const v = rubOf(r.cost.id); return v === null ? EMPTY : `${formatMoney(v)} ₽`; } },
+    { key: 'amount', header: F.amount, align: 'right', render: (r) => (r.cost.amount === undefined ? EMPTY : `${formatMoney(r.cost.amount)} ${r.cost.currency}`) },
+    { key: 'rub', header: F.amountRub, align: 'right', render: (r) => { const v = rubOf(r.cost.id); return v === null ? EMPTY : `${formatMoney(v)} ₽`; } },
     { key: 'comment', header: 'Комментарий', render: (r) => r.cost.comment ?? '' },
   ];
   const plan = rows.filter((r) => r.cost.status === 'plan');

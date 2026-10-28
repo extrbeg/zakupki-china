@@ -2,6 +2,7 @@
 // пустое значение, подписи валют и типов доставки. Округление — только здесь, при показе.
 
 import type { Currency, ISODate, ShipmentMode } from '../domain/model';
+import { DEFAULT_UNIT } from '../domain/labels';
 import { ruDate } from '../domain/format';
 
 export { ruDate };
@@ -43,7 +44,15 @@ export function formatQty(n: number | null | undefined): string {
   return isNum(n) ? fixed(n, 0, 3, false) : EMPTY;
 }
 
-/** Коэффициент (AD, AW как введены): без лишних нулей, до 4 знаков — `1,5`; нет значения — «—». */
+/** Единица измерения товара: своя, у старых товаров — «шт». */
+export const unitOf = (line: { unit?: string } | undefined): string => line?.unit?.trim() || DEFAULT_UNIT;
+
+/** Количество с единицей: `120 м`, `2,5 кг`; нет значения — «—». */
+export function formatQtyUnit(n: number | null | undefined, unit: string): string {
+  return isNum(n) ? `${formatQty(n)} ${unit}` : EMPTY;
+}
+
+/** Коэффициент (расчётный и фактический, как введены): без лишних нулей, до 4 знаков — `1,5`; нет значения — «—». */
 export function formatCoef(n: number | null | undefined): string {
   return isNum(n) ? fixed(n, 0, 4, false) : EMPTY;
 }

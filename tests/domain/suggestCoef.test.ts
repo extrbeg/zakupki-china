@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeCosting, suggestCoef } from '../../src/domain/costing';
+import { TYPE_ID_BY_MODE } from '../../src/domain/shipmentTypes';
 import { emptyDataset, type Cost, type Dataset, type Line, type Order, type ShipmentMode, type SupplierOrder } from '../../src/domain/model';
 
 // Каждый заказ — один поставщик RUB, одна позиция 10 шт × 100 ₽ (Y = 100) и затрата на позицию:
@@ -18,7 +19,9 @@ function history(rows: { supplierId: string; mode?: ShipmentMode; aw: number; co
   return { ...emptyDataset(), orders, supplierOrders: sos, lines, costs };
 }
 
-const suggest = (d: Dataset, supplierId: string, mode: ShipmentMode | undefined) => suggestCoef(d, computeCosting(d, '2026-10-25'), supplierId, mode);
+// тип поставки у старых записей — по plannedMode (plannedTypeIdOf)
+const suggest = (d: Dataset, supplierId: string, mode: ShipmentMode | undefined) =>
+  suggestCoef(d, computeCosting(d, '2026-10-25'), supplierId, mode ? TYPE_ID_BY_MODE[mode] : undefined);
 
 describe('suggestCoef', () => {
   const d = history([
@@ -56,5 +59,15 @@ describe('suggestCoef', () => {
   it('меньше 3 точек всего — value null, basis none', () => {
     const few = history([{ supplierId: 'A', aw: 1.5 }, { supplierId: 'A', aw: 1.7 }, { supplierId: 'A', aw: 2, complete: false }]);
     expect(suggest(few, 'A', undefined)).toEqual({ value: null, basis: 'none', points: 2 });
+  });
+});
+
+describe('suggestCoef: тип поставки из справочника', () => {
+  it('plannedTypeId главнее прежнего plannedMode; свой тип пользователя — своя группа', () => {
+    const d = history([
+      { supplierId: 'A', aw: 1.2 }, { supplierId: 'A', aw: 1.3 }, { supplierId: 'A', aw: 1.4 }, { supplierId: 'A', mode: 'air', aw: 3 },
+    ]);
+    d.supplierOrders = d.supplierOrders.map((so, i) => (i < 3 ? { ...so, plannedTypeId: 'stp_my', plannedMode: 'air' } : so));
+    expect(suggestCoef(d, computeCosting(d, '2026-10-25'), 'A', 'stp_my')).toMatchObject({ basis: 'supplier+mode', points: 3 });
   });
 });

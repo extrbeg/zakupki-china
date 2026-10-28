@@ -5,11 +5,12 @@
 import { useMemo, useState } from 'react';
 import type { Order, Shipment } from '../../../domain/model';
 import { orderRef } from '../../../domain/numbering';
+import { plannedTypeIdOfOrder } from '../../../domain/shipmentTypes';
 import { filterByQuery } from '../../../domain/search';
 import { useData } from '../../DataContext';
-import { ErrorBanner, Field, FormGrid, SelectField, SuggestInput, parseUserNumber } from '../../components';
+import { AddableSelect, ErrorBanner, Field, FormGrid, SuggestInput, parseUserNumber } from '../../components';
 import { storeDefaultTypes } from '../../directories/shipmentTypes';
-import { formatQty } from '../../format';
+import { formatQty, formatQtyUnit, unitOf } from '../../format';
 import {
   fullQtys, newShipmentDraft, orderSearchText, planSendBatches, sendQtyErrors, sendableLines, type SendQtys, type SendRow,
 } from './sendLogic';
@@ -54,7 +55,7 @@ function SendLinesTable({ rows, texts, errors, onChange }: {
               <tr key={r.line.id} data-testid={`send-row-${r.line.id}`}>
                 <td>{r.supplierName || '—'}</td>
                 <td className="ship-send-table__name">{r.line.seq}. {r.title}</td>
-                <td style={{ textAlign: 'right' }}>{formatQty(r.line.qty)}</td>
+                <td style={{ textAlign: 'right' }}>{formatQtyUnit(r.line.qty, unitOf(r.line))}</td>
                 <td style={{ textAlign: 'right' }}>{formatQty(r.shipped)}</td>
                 <td style={{ textAlign: 'right' }}>{formatQty(r.remaining)}</td>
                 <td style={{ textAlign: 'right' }}>
@@ -89,7 +90,8 @@ export function SendToShipment(props: Props) {
   const [failure, setFailure] = useState<unknown>(undefined);
   const [busy, setBusy] = useState(false);
 
-  const draftShipment = useMemo(() => newShipmentDraft(ds, today), [ds, today]);
+  // новая поставка из заказа берёт тип поставки его поставщиков (если он у всех один)
+  const draftShipment = useMemo(() => newShipmentDraft(ds, today, orderId ? plannedTypeIdOfOrder(ds, orderId) : undefined), [ds, today, orderId]);
   const shipmentOptions = useMemo(() => [
     { value: NEW_SHIPMENT, label: `Новая поставка (${draftShipment.number})` },
     ...[...ds.shipments].sort((a, b) => b.number.localeCompare(a.number, 'ru', { numeric: true })).map((s) => ({ value: s.id, label: s.number })),
@@ -153,8 +155,8 @@ export function SendToShipment(props: Props) {
       {failure !== undefined ? <ErrorBanner error={failure} /> : null}
       <FormGrid>
         {props.order ? (
-          <SelectField
-            label="Поставка" value={shipmentChoice} options={shipmentOptions} placeholder="— выберите поставку —" required className="ui-card__wide"
+          <AddableSelect
+            search label="Поставка" value={shipmentChoice} options={shipmentOptions} placeholder="— выберите поставку —" required className="ui-card__wide"
             error={errors._shipment} onChange={setShipmentChoice}
             hint={shipmentChoice === NEW_SHIPMENT ? 'Номер присвоится сам; тип, перевозчика и даты — в карточке поставки' : undefined}
           />

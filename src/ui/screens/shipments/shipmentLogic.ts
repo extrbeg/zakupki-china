@@ -3,7 +3,7 @@
 import { newId } from '../../../domain/ids';
 import type { Batch, Cost, Dataset, Declaration, Line, Order, Shipment } from '../../../domain/model';
 import { compareOrders, orderLabel, orderRef } from '../../../domain/numbering';
-import { formatMoney, formatQty } from '../../format';
+import { formatMoney, formatQty, unitOf } from '../../format';
 
 export const DEFAULT_VAT = 22;
 
@@ -52,7 +52,7 @@ export function lineChoices(ds: Dataset): (LineChoice & { search: string })[] {
     const label0 = order ? orderLabel(order) : '';
     const supplierName = suppliers.get(sos.get(line.supplierOrderId)?.supplierId ?? '')?.name ?? line.supplierName ?? '';
     const title = line.customerName || line.docName || line.supplierName || `позиция ${line.seq}`;
-    const label = `Заказ ${shown} · ${supplierName || 'без поставщика'} · ${line.seq}. ${title} — остаток ${formatQty(remaining)} из ${formatQty(line.qty)} шт`;
+    const label = `Заказ ${shown} · ${supplierName || 'без поставщика'} · ${line.seq}. ${title} — остаток ${formatQty(remaining)} из ${formatQty(line.qty)} ${unitOf(line)}`;
     const search = [`заказ ${orderNumber ?? ''}`, `№ ${orderNumber ?? ''}`, order?.code, supplierName, line.customerName, line.docName, line.supplierName, line.techParams].filter(Boolean).join(' ').toLowerCase();
     out.push({ line, orderNumber, orderLabel: label0, supplierName, title, remaining, label, search, order });
   }

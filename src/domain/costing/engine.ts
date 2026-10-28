@@ -135,7 +135,7 @@ export function computeCosting(ds: Dataset, today: ISODate): CostingResult {
       const o = orders.get(so.orderId);
       warn.add({
         code: 'NO_RATE',
-        message: `Заказ ${o ? orderRef(o) : '№ ?'}, поставщик ${so.seq}: нет курса ${CURRENCY_LABEL[so.currency]} на дату расчёта — Y, AB и таможенная стоимость не посчитаны`,
+        message: `Заказ ${o ? orderRef(o) : '№ ?'}, поставщик ${so.seq}: нет курса ${CURRENCY_LABEL[so.currency]} на дату расчёта — цена в ₽, прогноз цены в РФ и таможенная стоимость не посчитаны`,
         refs: [{ type: 'supplierOrder', id: so.id }],
       });
     }
@@ -439,7 +439,7 @@ export function computeCosting(ds: Dataset, today: ISODate): CostingResult {
     }
     t.costTotal = t.planRub + t.factRub;
     if (!o.costsComplete && [...lineCtx.values()].some((lc) => lc.line.orderId === o.id)) {
-      warn.add({ code: 'NOT_COMPLETE', message: `Заказ ${orderRef(o)}: не отмечено «Все затраты внесены» — AW предварительный`, refs: [{ type: 'order', id: o.id }] });
+      warn.add({ code: 'NOT_COMPLETE', message: `Заказ ${orderRef(o)}: не отмечено «Все затраты внесены» — фактический коэффициент себестоимости доставки предварительный`, refs: [{ type: 'order', id: o.id }] });
     }
     return t;
   });

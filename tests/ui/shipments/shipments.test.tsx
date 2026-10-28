@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { baseSeed, renderAt, rubCost, shipment, squash } from './helpers';
-import { pickSuggestion } from '../components/suggest';
+import { pickByValue, pickSuggestion, pickedValue, suggestionTexts } from '../components/suggest';
 
 const typeInto = (label: RegExp | string | HTMLElement, value: string) =>
   fireEvent.change(typeof label === 'object' && !(label instanceof RegExp) ? label : screen.getByLabelText(label), { target: { value } });
@@ -13,7 +13,7 @@ describe('список и создание поставки', () => {
     expect(await screen.findByLabelText(/^Номер поставки/)).toBeTruthy();
     expect((screen.getByLabelText(/^НДС, %/) as HTMLInputElement).value).toBe('20');
     typeInto(/^Номер поставки/, 'К-1');
-    typeInto('Тип поставки', 'stp_air');   // G29: тип — из «Типов поставки»
+    pickByValue(screen.getByLabelText('Тип поставки'), 'stp_air');   // G29: тип — из «Типов поставки»
     pickSuggestion(screen.getByLabelText('Перевозчик'), 'Море-Транс');
     typeInto('Отправка в РФ', '2026-11-01');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить поставку' }));
@@ -70,14 +70,14 @@ describe('номер и тип поставки (G28, G29)', () => {
 
   it('«+ Добавить…» в типе: название и правило — тип записан в «Типы поставки» и выбран', async () => {
     const { store } = renderAt('/shipments/new', { ...baseSeed, shipmentTypes: [{ id: 'stp_sea', name: 'Море, контейнер', basis: 'cbm' }] });
-    typeInto(await screen.findByLabelText('Тип поставки'), '\u0000add');
+    pickSuggestion(await screen.findByLabelText('Тип поставки'), '+ Добавить…', 'Ж/д, сборный');
     typeInto(screen.getByLabelText('Новый тип поставки'), 'Ж/д, сборный');
     typeInto(screen.getByLabelText('Делить доставку'), 'weight');
     fireEvent.click(screen.getByRole('button', { name: 'Добавить' }));
     await waitFor(async () => expect((await store.load()).shipmentTypes).toHaveLength(2));
     const added = (await store.load()).shipmentTypes.find((t) => t.name === 'Ж/д, сборный')!;
     expect(added).toMatchObject({ basis: 'weight' });
-    await waitFor(() => expect((screen.getByLabelText('Тип поставки') as HTMLSelectElement).value).toBe(added.id));
+    await waitFor(() => expect(pickedValue(screen.getByLabelText('Тип поставки'))).toBe(added.id));
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить поставку' }));
     await waitFor(async () => expect((await store.load()).shipments).toHaveLength(1));
     expect((await store.load()).shipments[0]).toMatchObject({ typeId: added.id, mode: 'other' });
@@ -95,26 +95,27 @@ describe('партии', () => {
 
   it('поиск по поставщику/названию сужает позиции; незакупаемые не показываются', async () => {
     renderAt('/shipments/sh1', seed);
-    const select = (await screen.findByLabelText(/^Позиция/)) as HTMLSelectElement;
-    expect(within(select).queryByText(/Не закупаем/)).toBeNull();
-    typeInto('Поиск позиции (заказ, поставщик, название)', 'beta');
-    expect(within(select).getByText(/Кабель силовой/)).toBeTruthy();
-    expect(within(select).queryByText(/Кран шаровой/)).toBeNull();
-    typeInto('Поиск позиции (заказ, поставщик, название)', '12');
-    expect(within(select).getByText(/Кран шаровой/)).toBeTruthy();
-    expect(within(select).queryByText(/Кабель силовой/)).toBeNull();
+    const field = (await screen.findByLabelText(/^Позиция/)) as HTMLInputElement;
+    act(() => field.focus());
+    expect(suggestionTexts(field).some((t) => /Не закупаем/.test(t))).toBe(false);
+    typeInto(field, 'beta');
+    expect(suggestionTexts(field).some((t) => /Кабель силовой/.test(t))).toBe(true);
+    expect(suggestionTexts(field).some((t) => /Кран шаровой/.test(t))).toBe(false);
+    typeInto(field, '12');
+    expect(suggestionTexts(field).some((t) => /Кран шаровой/.test(t))).toBe(true);
+    expect(suggestionTexts(field).some((t) => /Кабель силовой/.test(t))).toBe(false);
   });
 
   it('количество больше остатка — «В партиях 1200 из 1000 шт»; верное — партия с CBM и весом пропорционально', async () => {
     const { store } = renderAt('/shipments/sh1', seed);
     await screen.findByRole('button', { name: 'Добавить партию' });
-    typeInto(/^Позиция/, 'l1');
-    typeInto(/^Количество в партии/, '1200');
+    pickByValue(screen.getByLabelText(/^Позиция/), 'l1');
+    typeInto(/^Кол-во в партии/, '1200');
     fireEvent.click(screen.getByRole('button', { name: 'Добавить партию' }));
     expect(await screen.findByText('В партиях 1200 из 1000 шт')).toBeTruthy();
     expect((await store.load()).batches).toHaveLength(0);
 
-    typeInto(/^Количество в партии/, '600');
+    typeInto(/^Кол-во в партии/, '600');
     expect((screen.getByLabelText('CBM') as HTMLInputElement).value).toBe('6');
     expect((screen.getByLabelText('Вес, кг') as HTMLInputElement).value).toBe('300');
     fireEvent.click(screen.getByRole('button', { name: 'Добавить партию' }));
@@ -125,12 +126,12 @@ describe('партии', () => {
   it('«1о00» в количестве — ошибка «Введите число», партия не записана (а не 1 шт)', async () => {
     const { store } = renderAt('/shipments/sh1', seed);
     await screen.findByRole('button', { name: 'Добавить партию' });
-    typeInto(/^Позиция/, 'l1');
-    typeInto(/^Количество в партии/, '1');
-    typeInto(/^Количество в партии/, '1о00');
+    pickByValue(screen.getByLabelText(/^Позиция/), 'l1');
+    typeInto(/^Кол-во в партии/, '1');
+    typeInto(/^Кол-во в партии/, '1о00');
     fireEvent.click(screen.getByRole('button', { name: 'Добавить партию' }));
     expect(await screen.findByText('Введите число')).toBeTruthy();
-    expect((screen.getByLabelText(/^Количество в партии/) as HTMLInputElement).value).toBe('1о00');
+    expect((screen.getByLabelText(/^Кол-во в партии/) as HTMLInputElement).value).toBe('1о00');
     await new Promise((r) => setTimeout(r, 20));
     expect((await store.load()).batches).toHaveLength(0);
   });
@@ -157,7 +158,7 @@ describe('партии', () => {
       ],
     });
     fireEvent.click(await screen.findByRole('button', { name: /Изменить партию.*Кран шаровой/ }));
-    typeInto(/^Количество в партии/, '700');
+    typeInto(/^Кол-во в партии/, '700');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить партию' }));
     expect(await screen.findByText('В партиях 1100 из 1000 шт')).toBeTruthy();
     expect((await store.load()).batches.find((b) => b.id === 'b1')?.qty).toBe(600);

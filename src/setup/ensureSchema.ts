@@ -9,9 +9,10 @@ import type { ListItem } from '../domain/model';
 import { SCHEMA_VERSION, SHEETS, sheetFor, toRow, type ColType, type ColumnDef, type SheetDef } from '../store/schema';
 import { mapHeaders, upsertKeyValue } from '../store/sheetsStore';
 import { DEFAULT_COST_TYPES, DEFAULT_SETTINGS } from './defaults';
+import { DEFAULT_UNITS } from '../domain/labels';
 import { DEFAULT_SHIPMENT_TYPES } from '../domain/shipmentTypes';
 
-export interface SchemaReport { createdSheets: string[]; addedColumns: { sheet: string; headers: string[] }[] }
+export interface SchemaReport { createdSheets: string[]; addedColumns: { sheet: string; headers: string[] }[]; renamedColumns: { sheet: string; from: string; to: string }[] }
 
 export const NOT_APP_SPREADSHEET_TEXT = 'Это не таблица приложения — для переноса используйте Импорт';
 
@@ -54,7 +55,7 @@ function formatRequests(sheetId: number, columns: { col: ColumnDef; at: number }
 }
 
 export async function ensureSchema(api: SheetsApi, spreadsheetId: string): Promise<SchemaReport> {
-  const report: SchemaReport = { createdSheets: [], addedColumns: [] };
+  const report: SchemaReport = { createdSheets: [], addedColumns: [], renamedColumns: [] };
   let meta = await api.getMeta(spreadsheetId);
   const existing = new Set(meta.sheets.map((s) => s.title));
   const missing = SHEETS.filter((d) => !existing.has(d.sheet));
@@ -105,7 +106,16 @@ export async function ensureSchema(api: SheetsApi, spreadsheetId: string): Promi
       structure.push(...formatRequests(sheetId, def.columns.map((col, at) => ({ col, at }))));
       continue;
     }
-    const current = content.get(def.sheet)?.[0] ?? [];
+    const current = [...(content.get(def.sheet)?.[0] ?? [])];
+    // колонка под прежним названием (aliases) переименовывается — данные остаются на месте
+    for (const col of def.columns) {
+      if (current.some((h) => norm(h) === col.header)) continue;
+      const at = (col.aliases ?? []).map((old) => current.findIndex((h) => norm(h) === old)).find((i) => i >= 0);
+      if (at === undefined) continue;
+      current[at] = col.header;
+      report.renamedColumns.push({ sheet: def.sheet, from: norm(content.get(def.sheet)?.[0]?.[at]), to: col.header });
+      headerWrites.push({ range: rect(def.sheet, 1, at, 1, at), values: [[col.header]] });
+    }
     const have = new Set(current.map(norm));
     const add = def.columns.filter((c) => !have.has(c.header));
     if (add.length === 0) {
@@ -140,10 +150,16 @@ export async function ensureSchema(api: SheetsApi, spreadsheetId: string): Promi
   };
 
   const lists = sheetFor('lists');
-  if (dataRows(lists).length === 0) {
-    const items: ListItem[] = DEFAULT_COST_TYPES.map((value, i) => ({ id: newId('lst'), list: 'costType', value, order: i + 1 }));
-    await appendRecords(lists, items);
+  const listRows = dataRows(lists);
+  const listCol = mapHeaders(lists, finalHeaders.get(lists.sheet) ?? [])[lists.columns.findIndex((c) => c.key === 'list')];
+  const items: ListItem[] = listRows.length === 0
+    ? DEFAULT_COST_TYPES.map((value, i) => ({ id: newId('lst'), list: 'costType', value, order: i + 1 }))
+    : [];
+  // «Единицы измерения» появились позже остальных списков — дописываются и в таблицу, где их ещё нет
+  if (!(listCol >= 0 && listRows.some((r) => norm(r[listCol]) === 'unit'))) {
+    items.push(...DEFAULT_UNITS.map((value, i) => ({ id: newId('lst'), list: 'unit' as const, value, order: i + 1 })));
   }
+  await appendRecords(lists, items);
 
   // G29: «Типы поставки» — заранее заведённые типы (постоянные id), только если в листе нет данных
   const shipmentTypes = sheetFor('shipmentTypes');

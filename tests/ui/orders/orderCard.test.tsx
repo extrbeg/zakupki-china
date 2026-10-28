@@ -143,7 +143,7 @@ describe('поставщики в заказе', () => {
     pickSuggestion(within(b).getByLabelText(/^Поставщик/), 'Beta Cable');
     set(within(b).getByLabelText(/^Валюта/), 'USD');
     set(within(b).getByLabelText(/^Условия оплаты/), '30/70');
-    set(within(b).getByLabelText(/^План\. тип доставки/), 'air');
+    pickSuggestion(within(b).getByLabelText(/^Тип поставки/), /^Авиа/, 'Ави');
     set(within(b).getByLabelText(/^Дата запуска/), '2026-10-01');
     set(within(b).getByLabelText(/^Срок изготовления/), '20');
     expect(within(b).getByText('21.10.2026')).toBeTruthy();
@@ -153,7 +153,7 @@ describe('поставщики в заказе', () => {
     await waitFor(async () => expect((await store.load()).supplierOrders).toHaveLength(2));
     const so = (await store.load()).supplierOrders.find((s) => s.seq === 2);
     expect(so).toMatchObject({
-      orderId: 'o12', supplierId: 's2', currency: 'USD', paymentTerms: '30/70', plannedMode: 'air',
+      orderId: 'o12', supplierId: 's2', currency: 'USD', paymentTerms: '30/70', plannedTypeId: 'stp_air', plannedMode: 'air',
       launchDate: '2026-10-01', productionDays: 20, actualReadyDate: '2026-10-22', bitrixTaskId: '4444',
     });
     expect(await screen.findByRole('region', { name: 'Поставщик в заказе 12-2' })).toBeTruthy();
@@ -202,14 +202,14 @@ describe('позиции', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Подробнее о позиции 1' }));
     const form = screen.getByRole('form', { name: 'Позиция' });
     set(within(form).getByLabelText(/^Кол-во/), '0');
-    set(within(form).getByLabelText(/^Цена в валюте/), 'abc');
+    set(within(form).getByLabelText(/^Цена за единицу/), 'abc');
     fireEvent.click(within(form).getByRole('button', { name: 'Сохранить позицию' }));
     expect(await within(form).findByText('Количество должно быть больше нуля')).toBeTruthy();
     expect(within(form).getByText('Введите число')).toBeTruthy();
     expect((within(form).getByLabelText(/^Кол-во/) as HTMLInputElement).value).toBe('0');
-    expect((within(form).getByLabelText(/^Цена в валюте/) as HTMLInputElement).value).toBe('abc');
+    expect((within(form).getByLabelText(/^Цена за единицу/) as HTMLInputElement).value).toBe('abc');
     set(within(form).getByLabelText(/^Кол-во/), '5');
-    set(within(form).getByLabelText(/^Цена в валюте/), '-1');
+    set(within(form).getByLabelText(/^Цена за единицу/), '-1');
     fireEvent.click(within(form).getByRole('button', { name: 'Сохранить позицию' }));
     expect(await within(form).findByText('Цена не может быть отрицательной')).toBeTruthy();
     expect((await store.load()).lines.find((l) => l.id === 'ln1')).toMatchObject({ qty: 1000, unitPrice: 5 });
@@ -274,7 +274,7 @@ describe('позиции', () => {
       batches: [{ id: 'b1', shipmentId: 'sh1', lineId: 'ln1', qty: 600 }],
     };
     renderAt('/orders/o12', seed);
-    expect(await screen.findByText('отгружено 600 из 1000')).toBeTruthy();
+    expect(await screen.findByText('отгружено 600 из 1000 шт')).toBeTruthy();
   });
 });
 
@@ -394,5 +394,28 @@ describe('лента платежей', () => {
     const feed = await screen.findByRole('region', { name: 'Лента платежей' });
     expect(within(feed).getByRole('link', { name: 'Добавить затрату' }).getAttribute('href')).toBe('/costs?add=order:o12');
     expect(within(feed).getByRole('link', { name: 'Все затраты' }).getAttribute('href')).toBe('/costs?order=o12');
+  });
+});
+
+describe('единица измерения товара', () => {
+  it('в форме — «Ед. изм.» из списка, «Цена за единицу»; в таблице кол-во с единицей; в строке ввода — единица рядом с кол-вом', async () => {
+    const { store } = renderAt('/orders/o12', baseSeed);
+    fireEvent.click(await screen.findByRole('button', { name: 'Подробнее о позиции 1' }));
+    const form = screen.getByRole('form', { name: 'Позиция' });
+    const unit = within(form).getByLabelText(/^Ед\. изм\./) as HTMLInputElement;
+    expect(unit.value).toBe('шт');
+    pickSuggestion(unit, 'м', 'м');
+    expect(within(form).getByText(/за 1 м$/)).toBeTruthy();
+    fireEvent.click(within(form).getByRole('button', { name: 'Сохранить позицию' }));
+    await waitFor(async () => expect((await store.load()).lines.find((l) => l.id === 'ln1')?.unit).toBe('м'));
+    expect(await screen.findByText('1000 м')).toBeTruthy();
+    // строка быстрого ввода: единица выбирается рядом с кол-вом и сохраняется у нового товара
+    const table = screen.getByRole('table', { name: 'Товары 12-1' });
+    fireEvent.change(within(table).getByLabelText('Товар новой позиции'), { target: { value: 'Кабель' } });
+    fireEvent.change(within(table).getByLabelText('Кол-во новой позиции'), { target: { value: '250' } });
+    fireEvent.change(within(table).getByLabelText('Ед. изм. новой позиции'), { target: { value: 'м' } });
+    fireEvent.change(within(table).getByLabelText('Цена новой позиции'), { target: { value: '3' } });
+    fireEvent.click(within(table).getByRole('button', { name: 'Добавить' }));
+    await waitFor(async () => expect((await store.load()).lines.find((l) => l.customerName === 'Кабель')).toMatchObject({ qty: 250, unit: 'м' }));
   });
 });

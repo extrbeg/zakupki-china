@@ -7,7 +7,7 @@ export type ShipmentMode = 'sea_container' | 'road_container' | 'air' | 'other';
 export type CostStatus = 'plan' | 'fact';
 export type CostTargetType = 'order' | 'supplierOrder' | 'shipment' | 'declaration' | 'line';
 export type PayeeType = 'supplier' | 'agent' | 'carrier' | 'text';
-export type ListKey = 'payer' | 'department' | 'customer' | 'costType' | 'companyType' | 'direction' | 'specialization' | 'paymentTerms';
+export type ListKey = 'payer' | 'department' | 'customer' | 'costType' | 'companyType' | 'direction' | 'specialization' | 'paymentTerms' | 'unit';
 
 export interface Rate { id: string; date: ISODate; currency: Exclude<Currency, 'RUB'>; rate: number; source: 'vtb' | 'manual'; loadedAt?: string; comment?: string }
 export interface ListItem { id: string; list: ListKey; value: string; order: number }
@@ -25,8 +25,8 @@ export interface Carrier { id: string; name: string; type?: string; specializati
  * Заказ. code — номер `З-ГГГГ-NNN` (G33); number — NNN этого номера (у старых заказов без кода — прежний номер, он и показывается).
  */
 export interface Order { id: string; number: number; code?: string; date: ISODate; department?: string; payer?: string; customer?: string; title?: string; bitrixTaskId?: string; calcDate?: ISODate; costsComplete: boolean; comment?: string; createdAt?: string }
-export interface SupplierOrder { id: string; orderId: string; seq: number; supplierId: string; bitrixTaskId?: string; currency: Currency; calcDate?: ISODate; calcRate?: number; paymentTerms?: string; plannedMode?: ShipmentMode; launchDate?: ISODate; productionDays?: number; actualReadyDate?: ISODate; comment?: string; coef?: number /* прогнозный AD поставщика; позиции без своего AD берут его */ }
-export interface Line { id: string; orderId: string; supplierOrderId: string; seq: number; customerName?: string; techParams?: string; docName?: string; supplierName?: string; qty: number; unitPrice: number; purchased: boolean; hsCode?: string; dutyRate?: number; packaging?: string; packageSize?: string; cbm?: number; weight?: number; places?: number; coef?: number /* свой AD — переопределение AD поставщика */; comment?: string; customerNameEn?: string; techParamsEn?: string /* только чтение: формула GOOGLETRANSLATE в листе */ }
+export interface SupplierOrder { id: string; orderId: string; seq: number; supplierId: string; bitrixTaskId?: string; currency: Currency; calcDate?: ISODate; calcRate?: number; paymentTerms?: string; plannedMode?: ShipmentMode; launchDate?: ISODate; productionDays?: number; actualReadyDate?: ISODate; comment?: string; coef?: number /* расчётный коэффициент поставщика; позиции без своего берут его */; plannedTypeId?: string /* тип поставки из «Типов поставки»; plannedMode — прежний */ }
+export interface Line { id: string; orderId: string; supplierOrderId: string; seq: number; customerName?: string; techParams?: string; docName?: string; supplierName?: string; qty: number; unit?: string /* единица измерения; пусто — «шт» */; unitPrice: number; purchased: boolean; hsCode?: string; dutyRate?: number; packaging?: string; packageSize?: string; cbm?: number; weight?: number; places?: number; coef?: number /* свой AD — переопределение AD поставщика */; comment?: string; customerNameEn?: string; techParamsEn?: string /* только чтение: формула GOOGLETRANSLATE в листе */ }
 /** Как делить доставку поставки: по объёму (CBM) или по весу (G29). */
 export type ShipmentBasis = 'cbm' | 'weight';
 /** Тип поставки — справочник «Типы поставки» со своим правилом деления доставки. */

@@ -31,7 +31,7 @@ describe('SHEETS', () => {
 
   it('заголовки — по таблице §6', () => {
     expect(sheet('orders').columns.map((c) => c.header)).toEqual([
-      'id', 'Заказ', 'Дата заказа', 'Подразделение', 'Плательщик', 'Заказчик', 'Название', 'ID задачи Битрикс',
+      'id', 'Заказ', 'Дата заказа', 'Подразделение', 'Плательщик', 'Заказчик', 'Название', 'ID задачи Битрикс24',
       'Дата расчёта', 'Все затраты внесены', 'Комментарий', 'Создан', 'Номер заказа',
     ]);
     expect(sheet('batches').columns.map((c) => c.header)).toEqual(['id', 'shipmentId', 'lineId', 'Кол-во', 'CBM', 'Вес, кг', 'Мест', 'declarationId']);
@@ -140,12 +140,13 @@ describe('fromRow', () => {
   });
 });
 
-describe('«Поставщики в заказе» — коэффициент AD (G05)', () => {
-  it('колонка coef — «Коэффициент AD», последняя (ensureSchema допишет её в конец существующего листа)', () => {
+describe('«Поставщики в заказе» — расчётный коэффициент (G05)', () => {
+  it('колонка coef — расчётный коэффициент (прежнее название «Коэффициент AD»), за ней — тип поставки; обе в конце', () => {
     const def = sheet('supplierOrders');
-    expect(def.columns.at(-1)).toMatchObject({ key: 'coef', header: 'Коэффициент AD', type: 'number' });
-    expect(def.columns.map((c) => c.header).slice(0, -1)).toEqual([
-      'id', 'orderId', '№ поставщика', 'supplierId', 'ID задачи Битрикс', 'Валюта', 'Дата расчёта', 'Курс расчёта вручную',
+    expect(def.columns.at(-2)).toMatchObject({ key: 'coef', header: 'Расчётный коэффициент себестоимости доставки', aliases: ['Коэффициент AD'], type: 'number' });
+    expect(def.columns.at(-1)).toMatchObject({ key: 'plannedTypeId', header: 'typeId' });
+    expect(def.columns.map((c) => c.header).slice(0, -2)).toEqual([
+      'id', 'orderId', '№ поставщика', 'supplierId', 'ID задачи Битрикс24', 'Валюта', 'Дата расчёта', 'Курс расчёта (вручную)',
       'Условия оплаты', 'План. доставка', 'Дата запуска', 'Срок изготовления, дн', 'Факт. готовность', 'Комментарий',
     ]);
   });

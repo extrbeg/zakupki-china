@@ -2,15 +2,16 @@
 // «Добавить из заказа» — товары заказа с остатком; форма добавления/правки одной партии (истории 14, 38, 46).
 
 import { Link } from 'react-router-dom';
+import { SHORT } from '../../../domain/labels';
 import { compareOrders, orderRef } from '../../../domain/numbering';
 import { useMemo, useState } from 'react';
 import { newId } from '../../../domain/ids';
 import type { Batch, Dataset, Line, Order, Shipment } from '../../../domain/model';
 import { validateBatchQty } from '../../../domain/validation';
 import { useData } from '../../DataContext';
-import { ConfirmDelete, ErrorBanner, FormGrid, NumberField, SelectField, TextField, isBadNumber, type DataColumn } from '../../components';
+import { AddableSelect, ConfirmDelete, ErrorBanner, FormGrid, NumberField, isBadNumber, type DataColumn } from '../../components';
 import { cleanRecord } from '../../directories/records';
-import { formatMoney, formatQty } from '../../format';
+import { formatMoney, formatQty, formatQtyUnit, unitOf } from '../../format';
 import { lineChoices, proportionalDefaults, shippedQty } from './shipmentLogic';
 import { batchTitle } from './ShipmentWarnings';
 import { SendToShipment, type SendResult } from './SendToShipment';
@@ -22,7 +23,6 @@ interface FormProps { shipment: Shipment; batch?: Batch; onDone: () => void }
 function BatchForm({ shipment, batch, onDone }: FormProps) {
   const data = useData();
   const { ds } = data;
-  const [search, setSearch] = useState('');
   const [lineId, setLineId] = useState<string | undefined>(batch?.lineId);
   const [qty, setQty] = useState<number | undefined>(batch?.qty);
   // Пока поле не правили руками — в нём доля позиции пропорционально количеству.
@@ -36,8 +36,6 @@ function BatchForm({ shipment, batch, onDone }: FormProps) {
   const [busy, setBusy] = useState(false);
 
   const choices = useMemo(() => lineChoices(ds), [ds]);
-  const q = search.trim().toLowerCase();
-  const visible = choices.filter((c) => c.line.id === lineId || !q || c.search.includes(q));
   const line = ds.lines.find((l) => l.id === lineId);
   const defaults = proportionalDefaults(line, isBadNumber(qty) ? undefined : qty);
   const shown = {
@@ -91,21 +89,21 @@ function BatchForm({ shipment, batch, onDone }: FormProps) {
       <FormGrid>
         {batch ? null : (
           <>
-            <TextField label="Поиск позиции (заказ, поставщик, название)" type="search" value={search} onChange={setSearch} />
-            <SelectField
-              label="Позиция" value={lineId} placeholder="— выберите позицию —" error={errors.lineId} required
-              options={visible.map((c) => ({ value: c.line.id, label: c.label }))} onChange={pickLine}
+            <AddableSelect
+              label="Позиция" search value={lineId} placeholder="заказ, поставщик или товар" error={errors.lineId} required
+              hint="Начните вводить — найдём по номеру заказа, поставщику или названию"
+              options={choices.map((c) => ({ value: c.line.id, label: c.label }))} onChange={pickLine}
             />
           </>
         )}
         <NumberField
-          label="Количество в партии" value={qty} required error={errors.qty} onChange={setQty}
-          hint={remaining !== undefined ? `Остаток позиции: ${formatQty(remaining)} шт` : undefined}
+          label="Кол-во в партии" value={qty} required error={errors.qty} onChange={setQty}
+          hint={remaining !== undefined ? `Остаток позиции: ${formatQtyUnit(remaining, unitOf(ds.lines.find((l) => l.id === lineId)))}` : undefined}
         />
         <NumberField label="CBM" value={shown.cbm} error={errors.cbm} onChange={(v) => { setOwn((o) => ({ ...o, cbm: true })); setVals((s) => ({ ...s, cbm: v })); }} />
         <NumberField label="Вес, кг" value={shown.weight} error={errors.weight} onChange={(v) => { setOwn((o) => ({ ...o, weight: true })); setVals((s) => ({ ...s, weight: v })); }} />
         <NumberField label="Мест" value={shown.places} error={errors.places} onChange={(v) => { setOwn((o) => ({ ...o, places: true })); setVals((s) => ({ ...s, places: v })); }} />
-        <SelectField label="Декларация" value={declarationId} placeholder="— без декларации —" options={declOptions} onChange={setDeclarationId} />
+        <AddableSelect label="Декларация" search value={declarationId} placeholder="— без декларации —" options={declOptions} onChange={setDeclarationId} />
       </FormGrid>
       <div className="ui-card__actions">
         <button type="submit" className="btn btn--primary" disabled={busy}>{batch ? 'Сохранить партию' : 'Добавить партию'}</button>
@@ -171,7 +169,7 @@ export function BatchesSection({ shipment, highlightId }: { shipment: Shipment; 
 
   const columns: DataColumn<Batch>[] = [
     { key: 'line', header: 'Товар', render: (b) => lineName(ds.lines.find((l) => l.id === b.lineId)) },
-    { key: 'qty', header: 'Кол-во', align: 'right', render: (b) => formatQty(b.qty) },
+    { key: 'qty', header: 'Кол-во', align: 'right', render: (b) => formatQtyUnit(b.qty, unitOf(ds.lines.find((l) => l.id === b.lineId))) },
     ...(['cbm', 'weight', 'places'] as const).map((k): DataColumn<Batch> => ({
       key: k, header: k === 'cbm' ? 'CBM' : k === 'weight' ? 'Вес, кг' : 'Мест', align: 'right',
       render: (b) => {
@@ -192,11 +190,11 @@ export function BatchesSection({ shipment, highlightId }: { shipment: Shipment; 
       ),
     },
     {
-      key: 'unit', header: 'Себест. ед., ₽', align: 'right',
+      key: 'unit', header: SHORT.costUnit, align: 'right',
       render: (b) => <span data-testid="unit-cost">{formatMoney(costing.batches.find((x) => x.batchId === b.id)?.unitCost)}</span>,
     },
     {
-      key: 'avg', header: 'Средняя по товару, ₽', align: 'right',
+      key: 'avg', header: `${SHORT.costUnit} (средняя по товару)`, align: 'right',
       render: (b) => <span data-testid="line-avg-cost">{formatMoney(costing.lines.find((x) => x.lineId === b.lineId)?.AV)}</span>,
     },
     {

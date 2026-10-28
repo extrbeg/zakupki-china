@@ -507,12 +507,13 @@ function mapByHeaders<T extends { id: string; name: string }>(ctx: Ctx, sheet: s
   if (!values) return [];
   const def = sheetFor(entity);
   const nameDef = def.columns.find((c) => c.key === 'name')!;
-  const h = findHeaderRow(values, [nameDef.header]);
+  // в старой таблице колонки называются по-прежнему — ищем и по нынешнему названию, и по прежним (aliases)
+  const h = [nameDef.header, ...(nameDef.aliases ?? [])].map((name) => findHeaderRow(values, [name])).find((i) => i >= 0) ?? -1;
   if (h < 0) {
     ctx.problem(sheet, 1, `Не найдена строка заголовков («${nameDef.header}») — лист не перенесён`);
     return [];
   }
-  const cols = def.columns.filter((c) => c.key !== 'id').map((c) => ({ def: c, i: columnOf(values[h], c.header) })).filter((c) => c.i >= 0);
+  const cols = def.columns.filter((c) => c.key !== 'id').map((c) => ({ def: c, i: columnOf(values[h], c.header, ...(c.aliases ?? [])) })).filter((c) => c.i >= 0);
   const out: T[] = [];
   for (let r = h + 1; r < values.length; r++) {
     const row = values[r] ?? [];

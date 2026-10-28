@@ -2,6 +2,7 @@
 // Ручной курс на (дату, валюту) один: перенос правкой на дату/валюту, где ручной уже есть, — только после подтверждения.
 
 import { useState } from 'react';
+import { pastValues } from '../../directories/records';
 import type { ISODate, Rate } from '../../../domain/model';
 import { useData } from '../../DataContext';
 import { ConfirmDelete, DateField, ErrorBanner, FormGrid, NumberField, SelectField, TextField } from '../../components';
@@ -83,7 +84,7 @@ export function RateForm({ rate, onClose }: { rate: Rate; onClose: () => void })
           options={FOREIGN_CURRENCIES.map((c) => ({ value: c, label: CURRENCY_LABEL[c] }))}
         />
         <NumberField label="Курс, ₽" value={value} onChange={(v) => { editing(); setValue(v); }} error={errors.rate} required />
-        <TextField label="Комментарий" value={comment} onChange={setComment} className="ui-card__full" />
+        <TextField label="Комментарий" value={comment} onChange={setComment} className="ui-card__full" suggestions={pastValues(ds.rates, 'comment')} />
       </FormGrid>
       <p className="rate-note">Ручной курс на дату важнее курса ВТБ на ту же дату.</p>
       {clash && date ? (

@@ -192,7 +192,7 @@ describe('платёжный агент: страна (G21)', () => {
     const { store } = renderAt('/agents', seed());
     await screen.findByText('Агент Один');
     fireEvent.click(screen.getByRole('button', { name: 'Добавить агента' }));
-    type(/^Наименование/, 'Агент Ханой');
+    type(/^Название/, 'Агент Ханой');
     fireEvent.change(screen.getByLabelText(/^Страна/), { target: { value: 'Вьетнам' } });
     enter(/^Город/, 'Ханой');
     expect(input(/^Провинция/).value).toBe('Ханой');

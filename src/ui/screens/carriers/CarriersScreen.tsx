@@ -1,6 +1,7 @@
 // Экран «Перевозчики» (маршрут /carriers): список с поиском и карточка на этой же странице.
 
 import { useMemo, useState } from 'react';
+import { F } from '../../../domain/labels';
 import type { Carrier } from '../../../domain/model';
 import { useData } from '../../DataContext';
 import { DataTable, EmptyState, TextField, type DataColumn } from '../../components';
@@ -15,7 +16,7 @@ const contractText = (c: Carrier) =>
   [c.contractSigned ? 'подписан' : '', c.contractValidUntil ? `до ${ruDate(c.contractValidUntil)}` : ''].filter(Boolean).join(', ');
 
 const columns: DataColumn<Carrier>[] = [
-  { key: 'name', header: 'Наименование', render: (c) => c.name },
+  { key: 'name', header: F.name, render: (c) => c.name },
   { key: 'type', header: 'Тип', render: (c) => c.type ?? '' },
   { key: 'specialization', header: 'Специализация', render: (c) => c.specialization ?? '' },
   { key: 'phone', header: 'Телефон', render: (c) => c.phone ?? '' },

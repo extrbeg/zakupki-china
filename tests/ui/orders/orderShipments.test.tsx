@@ -1,3 +1,4 @@
+import { pickByValue, pickSuggestion } from '../components/suggest';
 import { describe, expect, it } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import type { Cost, Dataset, EntityName } from '../../../src/domain/model';
@@ -52,7 +53,7 @@ describe('поставки в карточке заказа (G30)', () => {
     expect(within(card).getByText(/Море, контейнер · отправка в РФ 05\.10\.2026/)).toBeTruthy();
     const row = within(card).getByText('1. Кран шаровой').closest('tr')!;
     const cells = within(row).getAllByRole('cell').map((c) => c.textContent);
-    expect(cells).toEqual(['Alpha Valve', '1. Кран шаровой', '600', '6', '300', '600 из 1000', '400']);
+    expect(cells).toEqual(['Alpha Valve', '1. Кран шаровой', '600', '6', '300', '600 из 1000 шт', '400']);
     expect(within(card).queryByText(/Кабель/)).toBeNull();   // чужой заказ в этой поставке не показывается
     const share = within(card).getByTestId('order-shipment-share-sh1');
     expect(share.textContent).toMatch(/Затраты поставки на заказ: 6\s000,00 ₽/);
@@ -63,8 +64,7 @@ describe('поставки в карточке заказа (G30)', () => {
     const { store } = renderAt('/orders/o12', seed);
     fireEvent.click(await screen.findByRole('button', { name: 'Отправить в поставку' }));
     const form = screen.getByRole('form', { name: 'Отправить в поставку' });
-    fireEvent.change(within(form).getByLabelText(/^Поставка/), { target: { value: '__new__' } });
-    expect(within(form).getByRole('option', { name: 'Новая поставка (П-2026-002)' })).toBeTruthy();
+    pickSuggestion(within(form).getByLabelText(/^Поставка/), 'Новая поставка (П-2026-002)');
     expect((within(form).getByLabelText('В поставку: Кран шаровой') as HTMLInputElement).value).toBe('400');
     expect((within(form).getByLabelText('В поставку: Фланец') as HTMLInputElement).value).toBe('100');
     expect(within(form).queryByLabelText('В поставку: Не в работе')).toBeNull();
@@ -91,7 +91,7 @@ describe('поставки в карточке заказа (G30)', () => {
     const form = screen.getByRole('form', { name: 'Отправить в поставку' });
     fireEvent.click(within(form).getByRole('button', { name: 'Добавить' }));
     expect(await within(form).findByText('Выберите поставку')).toBeTruthy();
-    fireEvent.change(within(form).getByLabelText(/^Поставка/), { target: { value: 'sh1' } });
+    pickByValue(within(form).getByLabelText(/^Поставка/), 'sh1');
     fireEvent.click(within(form).getByRole('button', { name: 'Добавить' }));
     await waitFor(async () => expect((await store.load()).batches).toHaveLength(4));
     expect((await store.load()).shipments).toHaveLength(1);
@@ -103,7 +103,7 @@ describe('поставки в карточке заказа (G30)', () => {
     renderWithStore('/orders/o12', store);
     fireEvent.click(await screen.findByRole('button', { name: 'Отправить в поставку' }));
     const form = screen.getByRole('form', { name: 'Отправить в поставку' });
-    fireEvent.change(within(form).getByLabelText(/^Поставка/), { target: { value: '__new__' } });
+    pickByValue(within(form).getByLabelText(/^Поставка/), '__new__');
     fireEvent.click(within(form).getByRole('button', { name: 'Добавить' }));
     expect(await within(form).findByRole('alert')).toBeTruthy();
     let saved = await store.load();
@@ -116,5 +116,19 @@ describe('поставки в карточке заказа (G30)', () => {
     const created = saved.shipments.find((s) => s.id !== 'sh1')!;
     const added = saved.batches.filter((b) => b.shipmentId === created.id);
     expect(added.map((b) => [b.lineId, b.qty]).sort()).toEqual([['l1', 400], ['l2', 100]]);
+  });
+});
+
+describe('тип поставки поставщика переходит в новую поставку', () => {
+  it('у поставщиков заказа тип «Авиа» — новая поставка из заказа получает его', async () => {
+    const withType = { ...seed, shipmentTypes: [...seed.shipmentTypes!, { id: 'stp_air', name: 'Авиа', basis: 'weight' as const }],
+      supplierOrders: seed.supplierOrders!.map((so) => (so.orderId === 'o12' ? { ...so, plannedTypeId: 'stp_air' } : so)) };
+    const { store } = renderAt('/orders/o12', withType);
+    fireEvent.click(await screen.findByRole('button', { name: 'Отправить в поставку' }));
+    const form = screen.getByRole('form', { name: 'Отправить в поставку' });
+    pickByValue(within(form).getByLabelText(/^Поставка/), '__new__');
+    fireEvent.click(within(form).getByRole('button', { name: 'Добавить' }));
+    await waitFor(async () => expect((await store.load()).shipments).toHaveLength(2));
+    expect((await store.load()).shipments.find((s) => s.id !== 'sh1')).toMatchObject({ typeId: 'stp_air', mode: 'air' });
   });
 });

@@ -1,3 +1,4 @@
+import { CODES_VERSION } from '../../src/setup/codes';
 import { describe, expect, it, vi } from 'vitest';
 import { createAndBind, restoreBinding } from '../../src/setup/connect';
 import { ensureSchema } from '../../src/setup/ensureSchema';
@@ -58,7 +59,7 @@ describe('разовое проставление при входе (G29, G33)',
     expect(code('c_late')).toBe('Р-2026-32-002');
     expect(code('c_ship')).toMatch(/^Р-\d{4}-ПК-1-001$/);
     expect(fake.values('sp_old', 'Затраты')[1][8]).toBe('моё');
-    expect((await readMeta(fake, 'sp_old')).codesVersion).toBe('1');
+    expect((await readMeta(fake, 'sp_old')).codesVersion).toBe(CODES_VERSION);
   });
 
   it('только пустые ячейки: номер, вписанный руками, остаётся; второй вход ничего не пишет в «Затраты» и «Поставки»', async () => {
@@ -104,6 +105,6 @@ describe('сбой разового проставления (G33)', () => {
 
     await restoreBinding(fake, EMAIL, deps());
     expect((await new SheetsStore(fake, 'sp_fail').load()).costs[0].code).toBe('Р-2026-32-001');
-    expect((await readMeta(fake, 'sp_fail')).codesVersion).toBe('1');
+    expect((await readMeta(fake, 'sp_fail')).codesVersion).toBe(CODES_VERSION);
   });
 });

@@ -1,6 +1,8 @@
 // Шапка поставки: номер (П-ГГГГ-NNN, сам), номер контейнера, тип из «Типов поставки», перевозчик, даты, ставка НДС (истории 38, 44, 97, 98).
 
 import { useState } from 'react';
+import { F } from '../../../domain/labels';
+import { pastValues } from '../../directories/records';
 import { useNavigate } from 'react-router-dom';
 import { newId } from '../../../domain/ids';
 import type { Dataset, Shipment } from '../../../domain/model';
@@ -80,7 +82,7 @@ export function ShipmentForm({ shipment }: { shipment?: Shipment }) {
           label="Номер поставки" required value={draft.number} error={errors.number} hint={shipment ? undefined : 'Присваивается сам: П-ГГГГ-NNN'}
           onChange={(v) => { setNumberTouched(true); set('number', v); }}
         />
-        <TextField label="Номер контейнера / накладной" value={draft.containerNo} onChange={(v) => set('containerNo', v)} />
+        <TextField label={F.containerNo} value={draft.containerNo} onChange={(v) => set('containerNo', v)} suggestions={pastValues(ds.shipments, 'containerNo')} />
         <ShipmentTypeField value={draft.typeId} onChange={(v) => set('typeId', v)} />
         <DirectorySelectField
           entity="carriers" label="Перевозчик" value={draft.carrierId} placeholder="— не выбран —" onChange={(v) => set('carrierId', v)}

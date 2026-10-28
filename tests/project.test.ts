@@ -42,3 +42,15 @@ describe('проект', () => {
     for (const cls of ['.ui-card {', '.ui-toolbar {', '.btn--danger {']) expect(styles).toContain(cls);
   });
 });
+
+describe('правила полей: одинаковые названия', () => {
+  const uiFiles = files(join(root, 'src', 'ui')).filter((f) => f.endsWith('.tsx'));
+  /** Строковые литералы файла без комментариев. */
+  const literals = (src: string) => (src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').match(/(['"`])(?:\\.|(?!\1)[^\\\n])*\1|>[^<>{}\n]+</g) ?? []);
+
+  it('в видимых текстах нет букв колонок старой таблицы, «₽/шт», «Почта», «Наименование», «тип доставки»', () => {
+    const bad = /\((AD|AW|AV|AB|Y|X|Z)\)|₽\/шт|Почта|Наименование|тип доставки/i;
+    const offenders = uiFiles.flatMap((f) => literals(readFileSync(f, 'utf8')).filter((l) => bad.test(l)).map((l) => `${f}: ${l}`));
+    expect(offenders).toEqual([]);
+  });
+});

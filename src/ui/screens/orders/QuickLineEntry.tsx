@@ -1,4 +1,4 @@
-// Строка быстрого ввода внизу таблицы товаров (G06): товар, кол-во, цена; Enter сохраняет позицию — по умолчанию не в работе
+// Строка быстрого ввода внизу таблицы товаров (G06): товар, кол-во с единицей (по умолчанию — как у прошлого товара поставщика), цена; Enter сохраняет позицию — по умолчанию не в работе
 // (запрос цены; «В работу» отмечается во вкладке «Сравнение цен» или в форме) — и возвращает курсор в товар новой пустой строки. Неверный ввод — ошибка у поля, ничего не сохраняется, введённое остаётся.
 // Вставка таблицы (с табуляцией или несколькими строками) в поле товара открывает «Вставить из Excel».
 // Товар подсказывается из прошлых позиций (история 93): выбранный (или введённый точно так же) берёт из последней такой позиции
@@ -14,7 +14,8 @@ import type { RatePick } from '../../../domain/rates';
 import { validateLine } from '../../../domain/validation';
 import { useData } from '../../DataContext';
 import { ErrorBanner, parseUserNumber } from '../../components';
-import { formatCoef, formatMoney } from '../../format';
+import { formatCoef, formatMoney, unitOf } from '../../format';
+import { listValues } from '../../directories/records';
 import { ProductNameInput, fillNote, useProductHints } from './ProductNameInput';
 
 type Key = 'name' | 'qty' | 'price';
@@ -32,6 +33,10 @@ export function QuickLineEntry({ order, so, nextSeq, rate, onPasteTable }: {
   const [errors, setErrors] = useState<Partial<Record<Key, string>>>({});
   const [saveError, setSaveError] = useState<unknown>(undefined);
   const [busy, setBusy] = useState(false);
+  const units = listValues(data.ds, 'unit');
+  const lastUnit = unitOf([...data.ds.lines].filter((l) => l.supplierOrderId === so.id).sort((a, b) => b.seq - a.seq)[0]);
+  const [unitChoice, setUnitChoice] = useState<string | undefined>(undefined);
+  const unit = unitChoice ?? lastUnit;
   const hints = useProductHints();
   /** Выбранная подсказка товара; действует, пока название не поменяли. */
   const [picked, setPicked] = useState<ProductHint | undefined>(undefined);
@@ -61,7 +66,7 @@ export function QuickLineEntry({ order, so, nextSeq, rate, onPasteTable }: {
     try {
       const line: Line = {
         id: newId('ln'), orderId: order.id, supplierOrderId: so.id, seq: nextSeq,
-        customerName: name, qty: qty as number, unitPrice: price as number, purchased: false,
+        customerName: name, qty: qty as number, unit, unitPrice: price as number, purchased: false,
       };
       const from = hintFor(name);
       if (from) Object.assign(line, productFill(from, qty as number));
@@ -131,7 +136,14 @@ export function QuickLineEntry({ order, so, nextSeq, rate, onPasteTable }: {
         {input('name', 'Товар новой позиции', { placeholder: 'Новый товар' })}
         {saveError !== undefined ? <ErrorBanner error={saveError} /> : null}
       </td>
-      <td>{input('qty', 'Кол-во новой позиции', { numeric: true, placeholder: 'шт' })}</td>
+      <td>
+        <div className="entry-qty">
+          {input('qty', 'Кол-во новой позиции', { numeric: true, placeholder: 'кол-во' })}
+          <select className="input input--cell entry-qty__unit" aria-label="Ед. изм. новой позиции" value={unit} onChange={(e) => setUnitChoice(e.target.value)}>
+            {(units.includes(unit) ? units : [unit, ...units]).map((u) => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+      </td>
       <td>{input('price', 'Цена новой позиции', { numeric: true, placeholder: 'цена' })}</td>
       <td className="num muted">{live ? formatMoney(live.X) : ''}</td>
       <td className="num muted">{live ? formatMoney(live.Y) : ''}</td>

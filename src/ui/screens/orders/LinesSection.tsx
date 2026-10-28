@@ -7,8 +7,9 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import type { Line, Order, SupplierOrder } from '../../../domain/model';
 import type { RatePick } from '../../../domain/rates';
 import { parseUserNumber } from '../../components';
-import { EMPTY, formatCoef, formatMoney, formatNumber, formatPct, formatQty } from '../../format';
-import { AD_SHORT, AW_SHORT, adTip, awTip } from './coefLabels';
+import { EMPTY, formatCoef, formatMoney, formatNumber, formatPct, formatQty, formatQtyUnit, unitOf } from '../../format';
+import { F, SHORT, TIP } from '../../../domain/labels';
+import { adTip, awTip } from './coefLabels';
 import { LineForm } from './LineForm';
 import type { LineRow } from './linesLogic';
 import { PastePanel } from './PastePanel';
@@ -16,22 +17,22 @@ import { QuickLineEntry } from './QuickLineEntry';
 import { usePurchased } from './purchasedQueue';
 
 /** Колонки таблицы по порядку (G04, G08); minor — скрывается на ширине ноутбука (≈1024 px), см. orders.css.
- *  Значения за единицу (₽/шт, прогноз, себестоимость) видны всегда; скрываются суммы «на кол-во». */
+ *  Значения за единицу (цена в ₽, прогноз, себестоимость) видны всегда; скрываются суммы «на кол-во». */
 const COLUMNS: { key: string; title: string; tip?: string; num?: boolean; minor?: boolean }[] = [
   { key: 'seq', title: '№' },
   { key: 'name', title: 'Товар' },
-  { key: 'qty', title: 'Кол-во', num: true },
-  { key: 'price', title: 'Цена, {cur}', tip: 'Цена за единицу в валюте поставщика', num: true },
-  { key: 'X', title: 'Сумма, {cur}', tip: 'X = кол-во × цена', num: true },
-  { key: 'Y', title: 'Цена ₽/шт', tip: 'Y = цена × курс даты расчёта', num: true },
-  { key: 'Z', title: 'Сумма ₽', tip: 'Z = Y × кол-во', num: true, minor: true },
-  { key: 'AD', title: AD_SHORT, tip: adTip('вводится прямо в ячейке; пусто — как у поставщика (показан бледно), своё значение выделено'), num: true },
-  { key: 'AB', title: 'Прогноз ₽/шт', tip: 'AB = Y × расчётный коэффициент — прогноз цены в РФ за единицу', num: true },
-  { key: 'ABqty', title: 'Прогноз ₽ на кол-во', tip: 'AB × кол-во', num: true, minor: true },
-  { key: 'AV', title: 'Себест. ₽/шт', tip: 'AV = себестоимость позиции / кол-во', num: true },
-  { key: 'AVqty', title: 'Себест. ₽ на кол-во', tip: 'AV × кол-во', num: true, minor: true },
-  { key: 'AW', title: AW_SHORT, tip: awTip('= себестоимость за единицу / цена в ₽ за единицу'), num: true },
-  { key: 'dev', title: 'Откл.', tip: 'Отклонение факт. коэффициента от расчётного: зелёный — фактически дешевле прогноза', num: true },
+  { key: 'qty', title: F.qty, num: true },
+  { key: 'price', title: `${SHORT.unitPrice}, {cur}`, tip: `${F.unitPrice}: ${TIP.unitPrice.toLowerCase()}`, num: true },
+  { key: 'X', title: `${SHORT.sum}, {cur}`, tip: `${F.sum}: ${TIP.sum.toLowerCase()}`, num: true },
+  { key: 'Y', title: SHORT.priceRub, tip: `${F.priceRub}: ${TIP.priceRub.toLowerCase()}`, num: true },
+  { key: 'Z', title: SHORT.sumRub, tip: `${F.sumRub}: ${TIP.sumRub.toLowerCase()}`, num: true, minor: true },
+  { key: 'AD', title: SHORT.coefPlan, tip: adTip('вводится прямо в ячейке; пусто — как у поставщика (показан бледно), своё значение выделено'), num: true },
+  { key: 'AB', title: SHORT.forecast, tip: `${F.forecast}: ${TIP.forecast.toLowerCase()}`, num: true },
+  { key: 'ABqty', title: SHORT.forecastQty, tip: `${F.forecastQty}: ${TIP.forecastQty.toLowerCase()}`, num: true, minor: true },
+  { key: 'AV', title: SHORT.costUnit, tip: `${F.costUnit}: ${TIP.costUnit.toLowerCase()}`, num: true },
+  { key: 'AVqty', title: SHORT.costQty, tip: `${F.costQty}: ${TIP.costQty.toLowerCase()}`, num: true, minor: true },
+  { key: 'AW', title: SHORT.coefFact, tip: awTip(TIP.coefFact.toLowerCase()), num: true },
+  { key: 'dev', title: SHORT.deviation, tip: TIP.deviation, num: true },
 ];
 /** Все колонки: «В работу» + данные + «Действия». */
 export const LINE_COLUMN_COUNT = COLUMNS.length + 2;
@@ -64,9 +65,9 @@ export function LinesSection({ order, so, code, rate, rows }: {
           <td data-col="name" className="cell--name">
             <span className={r.alt ? 'is-alt' : undefined}>{name}</span>
             {r.alt ? <span className="badge">не в работе</span> : null}
-            {!r.alt && r.shipped > 0 ? <small className="small-note">{`отгружено ${formatQty(r.shipped)} из ${formatQty(l.qty)}`}</small> : null}
+            {!r.alt && r.shipped > 0 ? <small className="small-note">{`отгружено ${formatQty(r.shipped)} из ${formatQtyUnit(l.qty, unitOf(l))}`}</small> : null}
           </td>
-          <td data-col="qty" className="num">{formatQty(l.qty)}</td>
+          <td data-col="qty" className="num">{formatQtyUnit(l.qty, unitOf(l))}</td>
           <td data-col="price" className="num">{formatNumber(l.unitPrice)}</td>
           <td data-col="X" className="num">{formatMoney(r.X)}</td>
           <td data-col="Y" className={colClass('Y')}>{formatMoney(r.Y)}</td>

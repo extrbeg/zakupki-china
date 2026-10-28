@@ -26,3 +26,13 @@ export function pickSuggestion(input: HTMLElement, option: string | RegExp, quer
 
 /** Выбранное значение поля выбора с поиском (id записи справочника или значение). */
 export const pickedValue = (input: HTMLElement): string => input.getAttribute('data-value') ?? '';
+
+/** Выбор в поле с поиском по значению пункта (id записи): открыть список заново и нажать пункт; '' — снять выбор. */
+export function pickByValue(input: HTMLElement, value: string): void {
+  act(() => input.blur());
+  if (value === '') { fireEvent.change(input, { target: { value: '' } }); fireEvent.blur(input); return; }
+  act(() => input.focus());
+  const option = within(suggestionList(input)).queryAllByRole('option').find((o) => o.getAttribute('data-value') === value);
+  if (!option) throw new Error(`Нет пункта «${value}» в списке поля ${input.getAttribute('aria-label') ?? input.id}`);
+  fireEvent.click(option);
+}

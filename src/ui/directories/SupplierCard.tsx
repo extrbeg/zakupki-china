@@ -2,6 +2,7 @@
 // Специализаций может быть несколько — в листе одной ячейкой через «; » (`domain/multiValue`).
 
 import { useState } from 'react';
+import { F } from '../../domain/labels';
 import { Link, useNavigate } from 'react-router-dom';
 import { newId } from '../../domain/ids';
 import { joinMultiValue, splitMultiValue } from '../../domain/multiValue';
@@ -12,7 +13,7 @@ import { PlaceFields } from './PlaceFields';
 import { citiesOfCountry, defaultCountryName } from './geography';
 import { validateCityProvince } from './cityLookup';
 import { resolveCityPair } from './cityPair';
-import { cleanRecord, validateName } from './records';
+import { cleanRecord, validateName, pastValues } from './records';
 import { supplierDeleteBlock } from './usage';
 import './directories.css';
 
@@ -30,6 +31,7 @@ export function SupplierCard({ supplier }: { supplier?: Supplier }) {
   const text = (key: keyof Supplier) => ({
     value: draft[key] as string | undefined,
     onChange: (v: string) => setDraft((d) => ({ ...d, [key]: v })),
+    suggestions: pastValues(data.ds.suppliers.filter((x) => x.id !== supplier?.id), key),   // прежние значения поля у других записей
   });
   const pick = (key: 'companyType' | 'direction', list: 'companyType' | 'direction') => ({
     list,
@@ -72,38 +74,38 @@ export function SupplierCard({ supplier }: { supplier?: Supplier }) {
         {saveError !== undefined ? <ErrorBanner error={saveError} /> : null}
         <h2 className="ui-card__section">Основное</h2>
         <FormGrid>
-          <TextField label="Название" required error={errors.name} {...text('name')} />
-          <ListSelectField label="Тип компании" {...pick('companyType', 'companyType')} />
-          <ListSelectField label="Направление" {...pick('direction', 'direction')} />
+          <TextField label={F.name} required error={errors.name} {...text('name')} />
+          <ListSelectField label={F.companyType} {...pick('companyType', 'companyType')} />
+          <ListSelectField label={F.direction} {...pick('direction', 'direction')} />
           <MultiListSelectField
-            list="specialization" label="Специализация" values={splitMultiValue(draft.specialization)}
+            list="specialization" label={F.specialization} values={splitMultiValue(draft.specialization)}
             onChange={(values) => setDraft((d) => ({ ...d, specialization: joinMultiValue(values) }))}
           />
-          <TextField label="Продукция/услуги" multiline {...text('products')} />
-          <TextField label="Цена (заметка)" {...text('priceNote')} />
+          <TextField label={F.products} multiline {...text('products')} />
+          <TextField label={F.priceNote} {...text('priceNote')} />
         </FormGrid>
         <h2 className="ui-card__section">Контакты и адрес</h2>
         <FormGrid>
-          <TextField label="Контактное лицо" {...text('contactPerson')} />
-          <TextField label="Телефон" type="tel" {...text('phone')} />
-          <TextField label="Почта" type="email" {...text('email')} />
-          <TextField label="Сайт" type="url" {...text('website')} />
+          <TextField label={F.contactPerson} {...text('contactPerson')} />
+          <TextField label={F.phone} type="tel" {...text('phone')} />
+          <TextField label={F.email} type="email" {...text('email')} />
+          <TextField label={F.website} type="url" {...text('website')} />
           <PlaceFields
             ds={ds} value={{ ...draft, country }} provinceError={errors.province}
             onChange={(next) => setDraft((d) => ({ ...d, ...next }))}
           />
-          <TextField label="Адрес" {...text('address')} />
+          <TextField label={F.address} {...text('address')} />
         </FormGrid>
         <h2 className="ui-card__section">Банковские реквизиты</h2>
         <FormGrid>
-          <TextField label="Получатель" {...text('bankBeneficiary')} />
-          <TextField label="Банк" {...text('bankName')} />
-          <TextField label="Счёт" {...text('bankAccount')} />
-          <TextField label="SWIFT" {...text('bankSwift')} />
-          <TextField label="Адрес банка" {...text('bankAddress')} />
+          <TextField label={F.bankBeneficiary} {...text('bankBeneficiary')} />
+          <TextField label={F.bankName} {...text('bankName')} />
+          <TextField label={F.bankAccount} {...text('bankAccount')} />
+          <TextField label={F.bankSwift} {...text('bankSwift')} />
+          <TextField label={F.bankAddress} {...text('bankAddress')} />
         </FormGrid>
         <h2 className="ui-card__section">Комментарий</h2>
-        <TextField label="Комментарий" multiline {...text('comment')} />
+        <TextField label={F.comment} multiline {...text('comment')} />
         <div className="ui-card__actions">
           <button type="submit" className="btn btn--primary" disabled={busy}>Сохранить</button>
           <Link className="btn" to="/suppliers">Отмена</Link>

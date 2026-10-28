@@ -3,6 +3,7 @@
 // AD поставщика сохраняется сразу при изменении (очередь записей, см. saveCoef).
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { plannedTypeIdOf } from '../../../domain/shipmentTypes';
 import { suggestCoef } from '../../../domain/costing';
 import { calcRateFor, effectiveCalcDate } from '../../../domain/lineFigures';
 import type { Order, SupplierOrder } from '../../../domain/model';
@@ -61,7 +62,7 @@ function ExistingBlock({ order, so, code }: { order: Order; so: SupplierOrder; c
     [ds, costing, so, rate, version],   // eslint-disable-line react-hooks/exhaustive-deps
   );
   const totals = sumLineRows(rows);
-  const suggestion = suggestCoef(ds, costing, so.supplierId, so.plannedMode);
+  const suggestion = suggestCoef(ds, costing, so.supplierId, plannedTypeIdOf(so));
 
   const effDate = effectiveCalcDate(order, so, today);
   const rateText = (() => {
@@ -123,7 +124,7 @@ function ExistingBlock({ order, so, code }: { order: Order; so: SupplierOrder; c
             <span className="small muted">{suggestionText(suggestion)}</span>
           ) : (
             <button
-              type="button" className="btn btn--small" title={`Медиана фактических коэффициентов (AW) закрытых позиций ${suggestionBasis(suggestion)}`}
+              type="button" className="btn btn--small" title={`Медиана фактических коэффициентов себестоимости доставки закрытых позиций ${suggestionBasis(suggestion)}`}
               onClick={() => { const v = suggestion.value ?? undefined; setAdError(undefined); setAdValue(v); saveCoef(v); }}
             >
               {suggestionText(suggestion)}

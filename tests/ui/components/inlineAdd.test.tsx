@@ -12,7 +12,8 @@ import { renderAt as renderShipments, baseSeed as shipSeed } from '../shipments/
 import { renderAt as renderDirs, baseSeed as dirSeed } from '../directories/helpers';
 import { pickSuggestion, pickedValue } from './suggest';
 
-const set = (el: HTMLElement, value: string) => fireEvent.change(el, { target: { value } });
+/** Ввод значения и уход из поля: у поля с поиском уход закрывает подсказки (их пункты не мешают искать поля по подписи). */
+const set = (el: HTMLElement, value: string) => { fireEvent.change(el, { target: { value } }); fireEvent.blur(el); };
 const value = (el: HTMLElement) => (el as HTMLInputElement).value;
 const header = () => screen.getByRole('region', { name: 'Шапка заказа' });
 /** Выбирает пункт по видимому тексту (например «+ Добавить…»): в выпадающем списке или в подсказках поля с поиском. */

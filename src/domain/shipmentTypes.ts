@@ -2,7 +2,7 @@
 // Заранее заведённые типы имеют постоянные id: по ним прежний тип поставки (`mode`) переносится в typeId
 // и при привязке таблицы, и при импорте, и в демо-наборе.
 
-import type { Dataset, Shipment, ShipmentBasis, ShipmentMode, ShipmentType } from './model';
+import type { Dataset, Shipment, ShipmentBasis, ShipmentMode, ShipmentType, SupplierOrder } from './model';
 
 export const DEFAULT_SHIPMENT_TYPES: readonly ShipmentType[] = [
   { id: 'stp_sea', name: 'Море, контейнер', basis: 'cbm' },
@@ -46,6 +46,26 @@ export function deliveryBasis(ds: Pick<Dataset, 'shipmentTypes'>, s: Pick<Shipme
   // правило, вписанное в лист руками («CBM», «объём»), — тоже по объёму; прочее — по весу
   if (t) return /^(cbm|об[ъь]?[её]м)/i.test(String(t.basis ?? '').trim()) ? 'cbm' : 'weight';
   return s.mode === 'sea_container' || s.mode === 'road_container' ? 'cbm' : 'weight';
+}
+
+/** Тип поставки поставщика в заказе: свой; у старых записей — по прежнему `plannedMode`. */
+export function plannedTypeIdOf(so: Pick<SupplierOrder, 'plannedTypeId' | 'plannedMode'>): string | undefined {
+  return so.plannedTypeId?.trim() || (so.plannedMode ? TYPE_ID_BY_MODE[so.plannedMode] ?? TYPE_ID_BY_MODE.other : undefined);
+}
+
+/** Тип новой поставки из заказа: единственный тип поставки его поставщиков; разные или не заданы — undefined. */
+export function plannedTypeIdOfOrder(ds: Pick<Dataset, 'supplierOrders'>, orderId: string): string | undefined {
+  const ids = new Set(ds.supplierOrders.filter((s) => s.orderId === orderId).map(plannedTypeIdOf).filter((t): t is string => Boolean(t)));
+  return ids.size === 1 ? [...ids][0] : undefined;
+}
+
+/** plannedTypeId поставщикам в заказе без него — по прежнему `plannedMode`, если такой тип есть в справочнике. */
+export function planSupplierOrderTypeIds(ds: Pick<Dataset, 'supplierOrders' | 'shipmentTypes'>): { id: string; typeId: string }[] {
+  const have = new Set((ds.shipmentTypes ?? []).map((t) => t.id));
+  return ds.supplierOrders
+    .filter((s) => !s.plannedTypeId?.trim() && s.plannedMode)
+    .map((s) => ({ id: s.id, typeId: plannedTypeIdOf(s) as string }))
+    .filter((p) => have.has(p.typeId));
 }
 
 /** typeId поставкам без типа — по прежнему `mode`, если такой тип есть в справочнике. */

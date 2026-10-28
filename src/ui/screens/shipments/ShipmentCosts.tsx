@@ -1,6 +1,7 @@
 // Затраты, привязанные к поставке и её декларациям (просмотр; вносятся на экране «Затраты» — ссылки ведут туда с привязкой и фильтром).
 
 import { Link } from 'react-router-dom';
+import { F } from '../../../domain/labels';
 import type { Shipment } from '../../../domain/model';
 import { useData } from '../../DataContext';
 import { formatMoney } from '../../format';
@@ -18,7 +19,7 @@ export function ShipmentCosts({ shipment }: { shipment: Shipment }) {
       ) : (
         <div className="table-scroll">
           <table className="table">
-            <thead><tr><th scope="col">Тип затрат</th><th scope="col">Привязка</th><th scope="col">Статус</th><th scope="col" style={{ textAlign: 'right' }}>Сумма</th><th scope="col" style={{ textAlign: 'right' }}>В рублях</th></tr></thead>
+            <thead><tr><th scope="col">{F.costType}</th><th scope="col">Привязка</th><th scope="col">Статус</th><th scope="col" style={{ textAlign: 'right' }}>Сумма</th><th scope="col" style={{ textAlign: 'right' }}>В рублях</th></tr></thead>
             <tbody>
               {costs.map((c) => (
                 <tr key={c.id}>

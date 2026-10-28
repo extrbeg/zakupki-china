@@ -24,7 +24,7 @@ describe('платёжные агенты', () => {
     const { store } = renderAt('/agents', seed);
     await screen.findByText('Агент Один');
     fireEvent.click(screen.getByRole('button', { name: 'Добавить агента' }));
-    type(/^Наименование/, 'Новый агент');
+    type(/^Название/, 'Новый агент');
     type(/^Контактное лицо/, 'Ван');
     type(/^Юридический адрес/, 'Шэньчжэнь, 1');
     type(/^Город/, 'Гуанчжоу');
@@ -82,12 +82,12 @@ describe('перевозчики', () => {
     const { store } = renderAt('/carriers', seed);
     await screen.findByText('Море-Транс');
     fireEvent.click(screen.getByRole('button', { name: 'Добавить перевозчика' }));
-    type(/^Наименование/, 'Новый перевозчик');
+    type(/^Название/, 'Новый перевозчик');
     type(/^Тип/, 'Авто');
     type(/^Специализация/, 'Сборные грузы');
     type(/^Контактное лицо/, 'Ли');
     type(/^Телефон/, '+7 1');
-    type(/^Почта/, 'c@d.ru');
+    type(/^Email/, 'c@d.ru');
     type(/^Сайт/, 'https://car.example');
     type(/^Договоры/, 'Д-1 от 2026');
     type(/^Срок действия договора/, '2027-01-31');
@@ -113,7 +113,7 @@ describe('перевозчики', () => {
   it('нет перевозчиков — пустое состояние открывает форму добавления', async () => {
     renderAt('/carriers', {});
     fireEvent.click(await screen.findByRole('button', { name: 'Добавить перевозчика' }));
-    expect(screen.getByLabelText(/^Наименование/)).toBeTruthy();
+    expect(screen.getByLabelText(/^Название/)).toBeTruthy();
   });
 
   it('перевозчик из поставки не удаляется: сообщение с номерами поставок', async () => {

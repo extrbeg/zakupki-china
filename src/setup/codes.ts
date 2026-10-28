@@ -1,5 +1,5 @@
-// Разовое проставление при входе (G29, G33): поставкам без типа — тип по прежнему `mode`, затратам без номера —
-// номера по порядку дат. Метка `codesVersion` в «_meta»: совпала — ничего не читается и не пишется.
+// Разовое проставление при входе (G29, G33): поставкам без типа — тип по прежнему `mode`, поставщикам в заказе — тип поставки
+// по прежнему «План. доставка», затратам без номера — номера по порядку дат. Метка `codesVersion` в «_meta»: совпала — ничего не читается и не пишется.
 // Запись — одной на колонку (null — ячейка не трогается), только в пустые ячейки: лист перечитывается прямо перед записью,
 // и номер, вписанный руками (или другим устройством) после загрузки, не перезаписывается.
 
@@ -7,15 +7,15 @@ import type { SheetsApi } from '../google/sheetsApi';
 import { a1, rect } from '../google/a1';
 import type { EntityName } from '../domain/model';
 import { planCostCodes } from '../domain/numbering';
-import { planShipmentTypeIds } from '../domain/shipmentTypes';
+import { planShipmentTypeIds, planSupplierOrderTypeIds } from '../domain/shipmentTypes';
 import { sheetFor } from '../store/schema';
 import { mapHeaders, SheetsStore, upsertKeyValue } from '../store/sheetsStore';
 import { readMeta } from './installScript';
 
-export const CODES_VERSION = '1';
+export const CODES_VERSION = '2';
 export const CODES_META_KEY = 'codesVersion';
 
-export interface CodesReport { shipmentTypes: number; costCodes: number }
+export interface CodesReport { shipmentTypes: number; costCodes: number; supplierOrderTypes: number }
 
 const norm = (v: unknown) => String(v ?? '').trim();
 
@@ -29,8 +29,10 @@ export async function ensureCodes(api: SheetsApi, spreadsheetId: string): Promis
   const codes = planCostCodes(ds);
   const shipmentTypes = await fillEmpty(api, spreadsheetId, 'shipments', 'typeId', new Map(types.map((t) => [t.id, t.typeId])));
   const costCodes = await fillEmpty(api, spreadsheetId, 'costs', 'code', new Map(codes.map((c) => [c.id, c.code])));
+  const soTypes = planSupplierOrderTypeIds(ds);
+  const supplierOrderTypes = await fillEmpty(api, spreadsheetId, 'supplierOrders', 'plannedTypeId', new Map(soTypes.map((t) => [t.id, t.typeId])));
   await upsertKeyValue(api, spreadsheetId, sheetFor('meta').sheet, CODES_META_KEY, CODES_VERSION);
-  return { shipmentTypes, costCodes };
+  return { shipmentTypes, costCodes, supplierOrderTypes };
 }
 
 /** Записать значения в колонку `key` строк с этими id — только туда, где ячейка пуста. Возвращает число записанных. */

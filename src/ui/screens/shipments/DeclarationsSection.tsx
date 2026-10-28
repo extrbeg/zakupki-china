@@ -1,6 +1,7 @@
 // Декларации поставки: добавление, правка, раскладка партий, плановые пошлина и НДС (истории 41–44).
 
 import { useState } from 'react';
+import { pastValues } from '../../directories/records';
 import { newId } from '../../../domain/ids';
 import type { Declaration, Shipment } from '../../../domain/model';
 import { useData } from '../../DataContext';
@@ -46,7 +47,7 @@ function DeclarationCard({ declaration }: { declaration: Declaration }) {
       <FormGrid>
         <TextField label="Номер ДТ" value={draft.number} onChange={(v) => setDraft((d) => ({ ...d, number: v }))} />
         <DateField label="Дата ДТ" value={draft.date} onChange={(v) => setDraft((d) => ({ ...d, date: v }))} />
-        <TextField label="Комментарий к ДТ" value={draft.comment} onChange={(v) => setDraft((d) => ({ ...d, comment: v }))} />
+        <TextField label="Комментарий к ДТ" value={draft.comment} onChange={(v) => setDraft((d) => ({ ...d, comment: v }))} suggestions={pastValues(ds.declarations, 'comment')} />
       </FormGrid>
       <dl className="ship-decl__facts">
         <div><dt>Партий</dt><dd>{assigned.length}</dd></div>

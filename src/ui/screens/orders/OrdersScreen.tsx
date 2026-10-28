@@ -1,6 +1,7 @@
 // Экран «Заказы» (маршрут /): список с поиском по номеру, заказчику, названию и ID задачи Битрикс.
 
 import { useMemo, useState } from 'react';
+import { F } from '../../../domain/labels';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../../DataContext';
 import { DataTable, EmptyState, TextField, type DataColumn } from '../../components';
@@ -51,7 +52,7 @@ export default function OrdersScreen() {
     { key: 'title', header: 'Название', render: (o) => o.title ?? '' },
     { key: 'department', header: 'Подразделение', render: (o) => o.department ?? '' },
     { key: 'suppliers', header: 'Поставщиков', render: (o) => String(supplierCount.get(o.id) ?? 0), align: 'right' },
-    { key: 'bitrix', header: 'Задачи Битрикс', render: bitrixIds },
+    { key: 'bitrix', header: F.bitrixTaskId, render: bitrixIds },
     { key: 'closed', header: 'Затраты', render: (o) => (o.costsComplete ? 'все внесены' : '') },
   ];
 
@@ -59,7 +60,7 @@ export default function OrdersScreen() {
     <section className="screen">
       <h1 className="screen__title">Заказы</h1>
       <div className="ui-toolbar">
-        <TextField label="Поиск: номер, заказчик, ID задачи Битрикс" type="search" value={query} onChange={setQuery} />
+        <TextField label="Поиск: номер, заказчик, ID задачи Битрикс24" type="search" value={query} onChange={setQuery} />
         <span className="ui-toolbar__spacer" />
         <button type="button" className="btn btn--primary" onClick={() => navigate('/orders/new')}>Создать заказ</button>
       </div>

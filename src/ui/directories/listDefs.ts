@@ -10,4 +10,5 @@ export const LIST_DEFS: { key: ListKey; label: string }[] = [
   { key: 'direction', label: 'Направления' },
   { key: 'specialization', label: 'Специализации' },
   { key: 'paymentTerms', label: 'Условия оплаты' },
+  { key: 'unit', label: 'Единицы измерения' },
 ];

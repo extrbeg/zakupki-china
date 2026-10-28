@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { baseSeed, renderAt } from './helpers';
 import { pickSuggestion, suggestionTexts, suggestionValues } from '../components/suggest';
-import { ADD_OPTION_VALUE } from '../../../src/ui/components';
 
 const input = (label: RegExp) => screen.getByLabelText(label) as HTMLInputElement;
 const type = (label: RegExp, value: string) => fireEvent.change(input(label), { target: { value } });
@@ -81,14 +80,17 @@ describe('карточка поставщика: несколько специа
     const { store } = renderAt('/suppliers/new', baseSeed);
     await screen.findByRole('heading', { name: 'Новый поставщик' });
     type(/^Название/, 'Мульти');
-    const spec = () => screen.getByLabelText(/^Специализация/) as HTMLSelectElement;
-    fireEvent.change(spec(), { target: { value: 'Краны' } });
-    fireEvent.change(spec(), { target: { value: 'Кабель' } });
+    const spec = () => input(/^Специализация/);
+    const addSpec = (v: string) => { fireEvent.change(spec(), { target: { value: v } }); fireEvent.blur(spec()); };
+    addSpec('Краны');
+    addSpec('Кабель');
     expect(within(screen.getByRole('list', { name: 'Выбрано: Специализация' })).getAllByRole('listitem').map((li) => li.firstChild?.textContent))
       .toEqual(['Краны', 'Кабель']);
-    expect([...spec().options].map((o) => o.textContent)).not.toContain('Краны');
+    act(() => spec().focus());
+    expect(suggestionValues(spec())).not.toContain('Краны');   // выбранное в списке не предлагается
+    act(() => spec().blur());
     fireEvent.click(screen.getByRole('button', { name: 'Убрать «Краны»' }));
-    fireEvent.change(spec(), { target: { value: 'Краны' } });
+    addSpec('Краны');
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
     await waitFor(async () => expect((await store.load()).suppliers).toHaveLength(5));
     expect((await store.load()).suppliers.find((x) => x.name === 'Мульти')?.specialization).toBe('Кабель; Краны');
@@ -100,7 +102,7 @@ describe('карточка поставщика: несколько специа
     await screen.findByRole('heading', { name: 'Старый' });
     expect(within(screen.getByRole('list', { name: 'Выбрано: Специализация' })).getAllByRole('listitem').map((li) => li.firstChild?.textContent))
       .toEqual(['Краны', 'Фитинги, отводы']);
-    fireEvent.change(screen.getByLabelText(/^Специализация/), { target: { value: ADD_OPTION_VALUE } });
+    pickSuggestion(input(/^Специализация/), '+ Добавить…');
     const name = screen.getByLabelText('Новое значение: Специализация');
     fireEvent.change(name, { target: { value: 'Насосы' } });
     fireEvent.keyDown(name, { key: 'Enter' });
@@ -116,7 +118,7 @@ describe('карточка поставщика: поля и сохранени�
     await screen.findByRole('heading', { name: 'Новый поставщик' });
     const fields: [RegExp, string][] = [
       [/^Название/, 'Омега Трейд'], [/^Продукция/, 'Краны, фитинги'], [/^Цена/, 'от 5 до 9 юаней'],
-      [/^Контактное лицо/, 'Ли Мэй'], [/^Телефон/, '+86 123'], [/^Почта/, 'a@b.cn'],
+      [/^Контактное лицо/, 'Ли Мэй'], [/^Телефон/, '+86 123'], [/^Email/, 'a@b.cn'],
       [/^Адрес$/, 'ул. Тестовая, 1'], [/^Сайт/, 'https://omega.example'],
       [/^Получатель/, 'Omega Trade Co'], [/^Банк$/, 'Bank of Test'], [/^Счёт/, '622202'],
       [/^SWIFT/, 'TESTCNBJ'], [/^Адрес банка/, 'Test Road 5'], [/^Комментарий/, 'проверка'],
@@ -236,5 +238,22 @@ describe('список поставщиков', () => {
     await screen.findByRole('heading', { name: 'Поставщики' });
     fireEvent.click(screen.getByRole('link', { name: 'Alpha Valve' }));
     expect((await findByTestId('where')).textContent).toBe('/suppliers/s1');
+  });
+});
+
+describe('подсказки по прежним значениям', () => {
+  it('контактное лицо и банк подсказываются из других поставщиков; новое значение вписывается свободно', async () => {
+    const seed = { ...baseSeed, suppliers: [...baseSeed.suppliers!, { id: 's5', name: 'Epsilon', contactPerson: 'Ли Нин', bankName: 'Bank of China' }] };
+    const { store } = renderAt('/suppliers/new', seed);
+    await screen.findByRole('heading', { name: 'Новый поставщик' });
+    type(/^Название/, 'Новый');
+    act(() => input(/^Контактное лицо/).focus());
+    type(/^Контактное лицо/, 'ли');
+    expect(suggestionValues(input(/^Контактное лицо/))).toEqual(['Ли Нин']);
+    pickSuggestion(input(/^Контактное лицо/), 'Ли Нин');
+    act(() => input(/^Банк$/).focus());
+    type(/^Банк$/, 'Сбер');
+    fireEvent.click(screen.getByRole('button', { name: 'Сохранить' }));
+    await waitFor(async () => expect((await store.load()).suppliers.find((x) => x.name === 'Новый')).toMatchObject({ contactPerson: 'Ли Нин', bankName: 'Сбер' }));
   });
 });

@@ -1,12 +1,14 @@
 // Схема листов таблицы пользователя — единственный источник правды (используют store, setup и import).
 // Даты пишутся serial-числами Google Sheets (эпоха 1899-12-30), читаются из UNFORMATTED_VALUE + SERIAL_NUMBER.
 
+import { F } from '../domain/labels';
 import type { EntityName } from '../domain/model';
 
 export type ColType = 'string' | 'number' | 'int' | 'bool' | 'date' | 'datetime' | 'formula';
 /** Разделитель аргументов в формулах: зависит от локали таблицы (ru_RU — «;»), G27. */
 export type FormulaSeparator = ',' | ';';
-export interface ColumnDef { key: string; header: string; type: ColType; formula?: (rowRef: (key: string) => string, sep?: FormulaSeparator) => string }
+/** aliases — прежние заголовки колонки: по ним колонка находится в старых таблицах, ensureSchema переименовывает её в `header`. */
+export interface ColumnDef { key: string; header: string; type: ColType; aliases?: string[]; formula?: (rowRef: (key: string) => string, sep?: FormulaSeparator) => string }
 export interface SheetDef { entity: EntityName | 'settings' | 'meta' | 'log'; sheet: string; columns: ColumnDef[] }
 export type Cell = string | number | boolean | null;
 
@@ -15,6 +17,8 @@ export const SCHEMA_VERSION = 1;
 export const REPORT_SHEET = 'Себестоимость' as const;
 
 const c = (key: string, header: string, type: ColType = 'string'): ColumnDef => ({ key, header, type });
+/** Колонка с переименованным заголовком: прежние названия — `aliases`. */
+const cr = (key: string, header: string, old: string[], type: ColType = 'string'): ColumnDef => ({ key, header, type, aliases: old });
 const id = c('id', 'id');
 const translate = (sourceKey: string) => (rowRef: (key: string) => string, sep: FormulaSeparator = ',') => {
   const ref = rowRef(sourceKey);
@@ -33,8 +37,8 @@ export const SHEETS: SheetDef[] = [
   { entity: 'cities', sheet: 'Города', columns: [id, c('city', 'Город'), c('province', 'Провинция'), c('population', 'Население', 'int'), c('countryId', 'countryId')] },
   {
     entity: 'suppliers', sheet: 'Поставщики', columns: [
-      id, c('name', 'Компания'), c('companyType', 'Тип компании'), c('direction', 'Направление'), c('specialization', 'Специализация'),
-      c('products', 'Продукция/услуги'), c('priceNote', 'Цена'), c('contactPerson', 'Контактное лицо'), c('phone', 'Телефон'), c('email', 'Почта'),
+      id, cr('name', F.name, ['Компания']), c('companyType', 'Тип компании'), c('direction', 'Направление'), c('specialization', 'Специализация'),
+      c('products', 'Продукция/услуги'), cr('priceNote', F.priceNote, ['Цена']), c('contactPerson', 'Контактное лицо'), c('phone', 'Телефон'), cr('email', F.email, ['Почта']),
       c('city', 'Город'), c('province', 'Провинция'), c('address', 'Адрес'), c('website', 'Сайт'), c('bankBeneficiary', 'Получатель'),
       c('bankName', 'Банк'), c('bankAccount', 'Счёт'), c('bankSwift', 'SWIFT'), c('bankAddress', 'Адрес банка'), c('comment', 'Комментарий'),
       c('createdAt', 'Создан', 'datetime'), c('country', 'Страна'),
@@ -42,52 +46,54 @@ export const SHEETS: SheetDef[] = [
   },
   {
     entity: 'agents', sheet: 'Платежные агенты', columns: [
-      id, c('name', 'Наименование'), c('contactPerson', 'Контактное лицо'), c('legalAddress', 'Юридический адрес'), c('city', 'Город'),
-      c('province', 'Провинция'), c('phone', 'Телефон'), c('email', 'email'), c('requisites', 'Реквизиты'), c('comment', 'Комментарий'),
+      id, cr('name', F.name, ['Наименование']), c('contactPerson', 'Контактное лицо'), c('legalAddress', 'Юридический адрес'), c('city', 'Город'),
+      c('province', 'Провинция'), c('phone', 'Телефон'), cr('email', F.email, ['email']), c('requisites', 'Реквизиты'), c('comment', 'Комментарий'),
       c('country', 'Страна'),
     ],
   },
   {
     entity: 'carriers', sheet: 'Перевозчики', columns: [
-      id, c('name', 'Наименование перевозчика'), c('type', 'Тип'), c('specialization', 'Специализация'), c('contactPerson', 'Контактное лицо'),
-      c('phone', 'Телефон'), c('email', 'почта'), c('website', 'сайт'), c('contracts', 'Договора'), c('contractValidUntil', 'Срок действия договора', 'date'),
-      c('contractSigned', 'Договор подписан?', 'bool'), c('comment', 'Комментарий'),
+      id, cr('name', F.name, ['Наименование перевозчика']), c('type', 'Тип'), c('specialization', 'Специализация'), c('contactPerson', 'Контактное лицо'),
+      c('phone', 'Телефон'), cr('email', F.email, ['почта']), cr('website', F.website, ['сайт']), cr('contracts', F.contracts, ['Договора']), c('contractValidUntil', 'Срок действия договора', 'date'),
+      cr('contractSigned', F.contractSigned, ['Договор подписан?'], 'bool'), c('comment', 'Комментарий'),
     ],
   },
   {
     entity: 'orders', sheet: 'Заказы', columns: [
       id, c('number', 'Заказ', 'int'), c('date', 'Дата заказа', 'date'), c('department', 'Подразделение'), c('payer', 'Плательщик'),
-      c('customer', 'Заказчик'), c('title', 'Название'), c('bitrixTaskId', 'ID задачи Битрикс'), c('calcDate', 'Дата расчёта', 'date'),
+      c('customer', 'Заказчик'), c('title', 'Название'), cr('bitrixTaskId', F.bitrixTaskId, ['ID задачи Битрикс']), c('calcDate', 'Дата расчёта', 'date'),
       c('costsComplete', 'Все затраты внесены', 'bool'), c('comment', 'Комментарий'), c('createdAt', 'Создан', 'datetime'),
       c('code', 'Номер заказа'),   // G33: «З-ГГГГ-NNN»; в конце — ensureSchema дописывает её в существующие таблицы
     ],
   },
   {
     entity: 'supplierOrders', sheet: 'Поставщики в заказе', columns: [
-      id, c('orderId', 'orderId'), c('seq', '№ поставщика', 'int'), c('supplierId', 'supplierId'), c('bitrixTaskId', 'ID задачи Битрикс'),
-      c('currency', 'Валюта'), c('calcDate', 'Дата расчёта', 'date'), c('calcRate', 'Курс расчёта вручную', 'number'), c('paymentTerms', 'Условия оплаты'),
+      id, c('orderId', 'orderId'), c('seq', '№ поставщика', 'int'), c('supplierId', 'supplierId'), cr('bitrixTaskId', F.bitrixTaskId, ['ID задачи Битрикс']),
+      c('currency', 'Валюта'), c('calcDate', 'Дата расчёта', 'date'), cr('calcRate', F.calcRate, ['Курс расчёта вручную'], 'number'), c('paymentTerms', 'Условия оплаты'),
       c('plannedMode', 'План. доставка'), c('launchDate', 'Дата запуска', 'date'), c('productionDays', 'Срок изготовления, дн', 'int'),
       c('actualReadyDate', 'Факт. готовность', 'date'), c('comment', 'Комментарий'),
-      c('coef', 'Коэффициент AD', 'number'),   // G05: в конце — ensureSchema дописывает её в существующие таблицы
+      cr('coef', F.coefPlan, ['Коэффициент AD'], 'number'),   // G05: в конце — ensureSchema дописывает её в существующие таблицы
+      c('plannedTypeId', 'typeId'),   // тип поставки поставщика (id из «Типов поставки»); в конце
     ],
   },
   {
     entity: 'lines', sheet: 'Позиции', columns: [
       id, c('orderId', 'orderId'), c('supplierOrderId', 'supplierOrderId'), c('seq', '№ позиции', 'int'), c('customerName', 'Название от заказчика'),
-      c('techParams', 'Тех. параметры'), c('docName', 'Название в документах'), c('supplierName', 'Product name from supplier'), c('qty', 'Кол-во', 'number'),
-      c('unitPrice', 'Цена в валюте', 'number'), c('purchased', 'Закупка', 'bool'), c('hsCode', 'HS Code'), c('dutyRate', 'Пошлина %', 'number'),
+      c('techParams', 'Тех. параметры'), c('docName', 'Название в документах'), cr('supplierName', F.supplierName, ['Product name from supplier']), c('qty', 'Кол-во', 'number'),
+      cr('unitPrice', F.unitPrice, ['Цена в валюте'], 'number'), cr('purchased', F.purchased, ['Закупка'], 'bool'), cr('hsCode', F.hsCode, ['HS Code']), cr('dutyRate', F.dutyRate, ['Пошлина %'], 'number'),
       c('packaging', 'Упаковка'), c('packageSize', 'Размер упаковки'), c('cbm', 'CBM', 'number'), c('weight', 'Вес, кг', 'number'), c('places', 'Мест', 'int'),
-      c('coef', 'Коэффициент AD', 'number'), c('comment', 'Комментарий'),
+      cr('coef', F.coefPlan, ['Коэффициент AD'], 'number'), c('comment', 'Комментарий'),
       { key: 'customerNameEn', header: 'Name EN (авто)', type: 'formula', formula: translate('customerName') },
       { key: 'techParamsEn', header: 'Tech EN (авто)', type: 'formula', formula: translate('techParams') },
+      c('unit', F.unit),   // единица измерения; в конце — ensureSchema дописывает её в существующие таблицы
     ],
   },
   // G29: тип поставки — справочник с правилом деления доставки ('cbm' | 'weight').
   { entity: 'shipmentTypes', sheet: 'Типы поставки', columns: [id, c('name', 'Название'), c('basis', 'Делить доставку')] },
   {
     entity: 'shipments', sheet: 'Поставки', columns: [
-      id, c('number', 'Поставка'), c('mode', 'Тип'), c('carrierId', 'Перевозчик'), c('consolidationDate', 'Отправка на консолидацию', 'date'),
-      c('sentDate', 'Отправка в РФ', 'date'), c('arrivalDate', 'Прибытие на СВХ', 'date'), c('vatRate', 'НДС %', 'number'), c('comment', 'Комментарий'),
+      id, cr('number', F.shipmentNumber, ['Поставка']), c('mode', 'Тип'), c('carrierId', 'Перевозчик'), c('consolidationDate', 'Отправка на консолидацию', 'date'),
+      c('sentDate', 'Отправка в РФ', 'date'), c('arrivalDate', 'Прибытие на СВХ', 'date'), cr('vatRate', F.vatRate, ['НДС %'], 'number'), c('comment', 'Комментарий'),
       c('typeId', 'typeId'), c('containerNo', 'Номер контейнера / накладной'),   // G28/G29: в конце
     ],
   },
@@ -101,10 +107,10 @@ export const SHEETS: SheetDef[] = [
   {
     entity: 'costs', sheet: 'Затраты', columns: [
       id, c('entryDate', 'Дата заполнения', 'date'), c('paymentDate', 'Дата оплаты', 'date'), c('status', 'Статус'), c('targetType', 'Привязка'),
-      c('targetId', 'targetId'), c('costType', 'Тип затрат'), c('payeeType', 'payeeType'), c('payeeId', 'payeeId'), c('payeeText', 'Кому платим'),
+      c('targetId', 'targetId'), cr('costType', F.costType, ['Тип затрат']), c('payeeType', 'payeeType'), c('payeeId', 'payeeId'), c('payeeText', 'Кому платим'),
       c('executor', 'Исполнитель операции'), c('invoiceNumber', 'Номер счёта'), c('invoiceDate', 'Дата счёта', 'date'), c('amount', 'Сумма в валюте', 'number'),
       c('currency', 'Валюта'), c('rate', 'Курс', 'number'), c('rateDate', 'Дата курса', 'date'), c('rateManual', 'Курс вручную', 'bool'),
-      c('amountRub', 'Сумма в р.', 'number'), c('comment', 'Комментарий'),
+      cr('amountRub', F.amountRub, ['Сумма в р.'], 'number'), c('comment', 'Комментарий'),
       c('code', 'Номер затраты'),   // G33: «Р-ГГГГ-<заказ>-NNN» / «Р-ГГГГ-П<NNN>-NNN»; в конце
     ],
   },

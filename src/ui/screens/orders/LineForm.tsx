@@ -1,10 +1,12 @@
-// Полная форма позиции («Подробнее» у строки): все поля истории 11, свой расчётный коэффициент (AD) с подсказкой и «как у поставщика», живой прогноз AB
-// по действующему коэффициенту; ошибки у полей, введённое не теряется.
+// Полная форма позиции («Подробнее» у строки): все поля истории 11, единица измерения, свой расчётный коэффициент с подсказкой и «как у поставщика»,
+// живой прогноз цены в РФ по действующему коэффициенту; ошибки у полей, введённое не теряется.
 // «Название от заказчика» подсказывается из прошлых позиций (история 93): выбор подставляет в пустые поля HS-код, пошлину, упаковку,
 // название у поставщика, вес и CBM на единицу × кол-во; вес и CBM, подставленные так, пересчитываются при смене кол-ва, пока их не правили.
 // Как и в строке быстрого ввода, то же делает точно набранное название прошлого товара; ручная правка названия снимает пересчёт по прежнему товару.
 
 import { useRef, useState } from 'react';
+import { pastValues } from '../../directories/records';
+import { plannedTypeIdOf } from '../../../domain/shipmentTypes';
 import { suggestCoef } from '../../../domain/costing';
 import { newId } from '../../../domain/ids';
 import { lineFigures } from '../../../domain/lineFigures';
@@ -13,15 +15,15 @@ import type { Line, Order, SupplierOrder } from '../../../domain/model';
 import type { RatePick } from '../../../domain/rates';
 import { validateLine } from '../../../domain/validation';
 import { useData } from '../../DataContext';
-import { CheckboxField, ConfirmDelete, ErrorBanner, Field, FormGrid, NumberField, TextField, isBadNumber } from '../../components';
-import { formatCoef, formatMoney } from '../../format';
-import { AD_LABEL } from './coefLabels';
+import { CheckboxField, ConfirmDelete, ErrorBanner, Field, FormGrid, ListSelectField, NumberField, TextField, isBadNumber } from '../../components';
+import { F } from '../../../domain/labels';
+import { formatCoef, formatMoney, unitOf } from '../../format';
 import { compact, lineDeleteBlock, suggestionBasis, suggestionText, supplierOrderCode } from './orderLogic';
 import { ProductNameInput, fillNote, useProductHints } from './ProductNameInput';
 
 type NumKey = 'qty' | 'unitPrice' | 'dutyRate' | 'cbm' | 'weight' | 'places' | 'coef';
 const NUM_KEYS: NumKey[] = ['qty', 'unitPrice', 'dutyRate', 'cbm', 'weight', 'places', 'coef'];
-type TextKey = 'customerName' | 'techParams' | 'docName' | 'supplierName' | 'hsCode' | 'packaging' | 'packageSize' | 'comment';
+type TextKey = 'customerName' | 'techParams' | 'docName' | 'supplierName' | 'unit' | 'hsCode' | 'packaging' | 'packageSize' | 'comment';
 
 /** Числа — как отдаёт NumberField: пусто — undefined, не число — NaN. */
 interface Draft { nums: Record<NumKey, number | undefined>; texts: Record<TextKey, string>; purchased: boolean }
@@ -45,7 +47,7 @@ export function LineForm({ order, so, line, nextSeq, rate, onClose }: {
   const [draft, setDraft] = useState<Draft>(() => ({
     nums: Object.fromEntries(NUM_KEYS.map((k) => [k, line?.[k]])) as Record<NumKey, number | undefined>,
     texts: {
-      customerName: line?.customerName ?? '', techParams: line?.techParams ?? '', docName: line?.docName ?? '', supplierName: line?.supplierName ?? '',
+      customerName: line?.customerName ?? '', techParams: line?.techParams ?? '', docName: line?.docName ?? '', supplierName: line?.supplierName ?? '', unit: unitOf(line),
       hsCode: line?.hsCode ?? '', packaging: line?.packaging ?? '', packageSize: line?.packageSize ?? '', comment: line?.comment ?? '',
     },
     purchased: line?.purchased ?? false,   // новая позиция — запрос цены, не в работе
@@ -88,10 +90,13 @@ export function LineForm({ order, so, line, nextSeq, rate, onClose }: {
     return { ...d, texts, nums };
   });
   const text = (key: TextKey, label: string, multiline = false) => (
-    <TextField label={label} multiline={multiline} value={draft.texts[key]} onChange={(v) => setDraft((d) => ({ ...d, texts: { ...d.texts, [key]: v } }))} />
+    <TextField
+      label={label} multiline={multiline} value={draft.texts[key]} onChange={(v) => setDraft((d) => ({ ...d, texts: { ...d.texts, [key]: v } }))}
+      suggestions={pastValues(ds.lines.filter((l) => l.id !== line?.id), key)}
+    />
   );
 
-  const suggestion = suggestCoef(ds, costing, so.supplierId, so.plannedMode);
+  const suggestion = suggestCoef(ds, costing, so.supplierId, plannedTypeIdOf(so));
   const basis = suggestionBasis(suggestion);
 
   // живой прогноз по введённым числам
@@ -100,7 +105,8 @@ export function LineForm({ order, so, line, nextSeq, rate, onClose }: {
     if (typeof live.qty !== 'number' || typeof live.unitPrice !== 'number') return null;
     const f = lineFigures({ qty: live.qty, unitPrice: live.unitPrice, coef: live.coef } as Line, rate, so);
     if (f.Y === null) return 'Нет курса на дату расчёта — прогноз не посчитан';
-    return `Цена ${formatMoney(f.Y)} ₽/шт${f.AB === null ? '' : `, прогноз ${formatMoney(f.AB)} ₽ за единицу`}`;
+    const u = draft.texts.unit || unitOf(undefined);
+    return `${F.priceRub}: ${formatMoney(f.Y)} ₽/${u}${f.AB === null ? '' : `; ${F.forecast.toLowerCase()}: ${formatMoney(f.AB)} ₽/${u}`}`;
   })();
 
   const save = async () => {
@@ -131,7 +137,7 @@ export function LineForm({ order, so, line, nextSeq, rate, onClose }: {
       <h4 style={{ margin: '0 0 8px' }}>{line ? `Позиция ${supplierOrderCode(order, so)}-${line.seq}` : 'Новая позиция'}</h4>
       {saveError !== undefined ? <ErrorBanner error={saveError} /> : null}
       <FormGrid>
-        <Field label="Название от заказчика" hint={fillNote(exactProductHint(hints, draft.texts.customerName)) || 'Начните вводить — подскажем товар из прошлых позиций'}>
+        <Field label={F.customerName} hint={fillNote(exactProductHint(hints, draft.texts.customerName)) || 'Начните вводить — подскажем товар из прошлых позиций'}>
           {({ id, describedBy }) => (
             <ProductNameInput
               id={id} aria-describedby={describedBy} hints={hints} value={draft.texts.customerName}
@@ -145,23 +151,24 @@ export function LineForm({ order, so, line, nextSeq, rate, onClose }: {
             />
           )}
         </Field>
-        {text('techParams', 'Тех. параметры', true)}
-        {text('docName', 'Название в документах')}
-        {text('supplierName', 'Название у поставщика (EN)')}
+        {text('techParams', F.techParams, true)}
+        {text('docName', F.docName)}
+        {text('supplierName', F.supplierName)}
         <TextField label="Name EN (авто)" value={line?.customerNameEn ?? ''} onChange={() => undefined} disabled placeholder={enHint} />
         <TextField label="Tech EN (авто)" value={line?.techParamsEn ?? ''} onChange={() => undefined} disabled placeholder={enHint} />
-        {num('qty', 'Кол-во')}
-        {num('unitPrice', 'Цена в валюте')}
-        <CheckboxField label="В работу" checked={draft.purchased} onChange={(c) => setDraft((d) => ({ ...d, purchased: c }))} />
-        {text('hsCode', 'HS-код')}
-        {num('dutyRate', 'Пошлина, %')}
-        {text('packaging', 'Упаковка')}
-        {text('packageSize', 'Размер упаковки')}
-        {num('cbm', 'CBM')}
-        {num('weight', 'Вес, кг')}
-        {num('places', 'Мест')}
+        {num('qty', F.qty)}
+        <ListSelectField list="unit" label={F.unit} value={draft.texts.unit} onChange={(v) => setDraft((d) => ({ ...d, texts: { ...d.texts, unit: v ?? '' } }))} />
+        {num('unitPrice', F.unitPrice, { hint: `в валюте поставщика (${so.currency}) за 1 ${draft.texts.unit || unitOf(undefined)}` })}
+        <CheckboxField label={F.purchased} checked={draft.purchased} onChange={(c) => setDraft((d) => ({ ...d, purchased: c }))} />
+        {text('hsCode', F.hsCode)}
+        {num('dutyRate', F.dutyRate)}
+        {text('packaging', F.packaging)}
+        {text('packageSize', F.packageSize)}
+        {num('cbm', F.cbm)}
+        {num('weight', F.weight)}
+        {num('places', F.places)}
         <div>
-          {num('coef', AD_LABEL, {
+          {num('coef', F.coefPlan, {
             hint: so.coef === undefined ? 'свой у позиции; у поставщика не задан' : `свой у позиции; пусто — как у поставщика (${formatCoef(so.coef)})`,
           })}
           <div className="coef-hint muted">
@@ -174,7 +181,7 @@ export function LineForm({ order, so, line, nextSeq, rate, onClose }: {
               suggestionText(suggestion)
             ) : (
               <button
-                type="button" className="btn btn--small" title={`Медиана фактических коэффициентов (AW) закрытых позиций ${basis}`}
+                type="button" className="btn btn--small" title={`Медиана фактических коэффициентов себестоимости доставки закрытых позиций ${basis}`}
                 onClick={() => setDraft((d) => ({ ...d, nums: { ...d.nums, coef: suggestion.value ?? undefined } }))}
               >
                 {suggestionText(suggestion)}
@@ -182,7 +189,7 @@ export function LineForm({ order, so, line, nextSeq, rate, onClose }: {
             )}
           </div>
         </div>
-        {text('comment', 'Комментарий', true)}
+        {text('comment', F.comment, true)}
       </FormGrid>
       {!draft.purchased ? <p className="line-form__preview">Не в работе — позиция остаётся предложением поставщика: в себестоимость и поставки не попадает.</p> : null}
       {preview ? <p className="line-form__preview">{preview}</p> : null}
